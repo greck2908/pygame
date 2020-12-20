@@ -1584,15 +1584,10 @@ vector_str(pgVector *self)
 static PyObject *
 vector_getAttr_swizzle(pgVector *self, PyObject *attr_name)
 {
-    double value;
     double *coords;
     Py_ssize_t i, idx, len;
     PyObject *attr_unicode = NULL;
-#if PY2
     Py_UNICODE *attr = NULL;
-#else
-    const char *attr = NULL;
-#endif
     PyObject *res = NULL;
 
     len = PySequence_Length(attr_name);
@@ -1607,11 +1602,7 @@ vector_getAttr_swizzle(pgVector *self, PyObject *attr_name)
     attr_unicode = PyUnicode_FromObject(attr_name);
     if (attr_unicode == NULL)
         goto swizzle_failed;
-#if PY2
     attr = PyUnicode_AsUnicode(attr_unicode);
-#else
-    attr = PyUnicode_AsUTF8AndSize(attr_unicode, &len);
-#endif
     if (attr == NULL)
         goto internal_error;
     /* If we are not a swizzle, go straight to GenericGetAttr. */
@@ -1635,32 +1626,22 @@ vector_getAttr_swizzle(pgVector *self, PyObject *attr_name)
             case 'y':
             case 'z':
                 idx = attr[i] - 'x';
-                goto swizzle_idx;
+                break;
             case 'w':
                 idx = 3;
-
-        swizzle_idx:
-                if (idx >= self->dim) {
-                    goto swizzle_failed;
-                };
-                value = coords[idx];
                 break;
-
-            case '0':
-                value = 0.0f;
-                break;
-            case '1':
-                value = 1.0f;
-                break;
-
             default:
                 goto swizzle_failed;
         }
         if (len == 2 || len == 3) {
-            ((pgVector *)res)->coords[i] = value;
-        } else {
-            if (PyTuple_SetItem(res, i, PyFloat_FromDouble(value)) != 0)
+            ((pgVector *)res)->coords[i] = coords[idx];
+        }
+        else if (idx < self->dim) {
+            if (PyTuple_SetItem(res, i, PyFloat_FromDouble(coords[idx])) != 0)
                 goto internal_error;
+        }
+        else {
+            goto swizzle_failed;
         }
     }
     /* swizzling succeeded! */
@@ -1681,11 +1662,7 @@ internal_error:
 static int
 vector_setAttr_swizzle(pgVector *self, PyObject *attr_name, PyObject *val)
 {
-#if PY2
-    Py_UNICODE *attr = NULL;
-#else
-    const char *attr = NULL;
-#endif
+    Py_UNICODE *attr;
     PyObject *attr_unicode;
     Py_ssize_t len = PySequence_Length(attr_name);
     double entry[VECTOR_MAX_SIZE];
@@ -1705,12 +1682,7 @@ vector_setAttr_swizzle(pgVector *self, PyObject *attr_name, PyObject *val)
     attr_unicode = PyUnicode_FromObject(attr_name);
     if (attr_unicode == NULL)
         return -1;
-#if PY2
     attr = PyUnicode_AsUnicode(attr_unicode);
-#else
-    attr = PyUnicode_AsUTF8AndSize(attr_unicode, &len);
-#endif
-
     if (attr == NULL) {
         Py_DECREF(attr_unicode);
         return -1;
@@ -2219,8 +2191,7 @@ static PyGetSetDef vector2_getsets[] = {
  ********************************/
 
 static PyTypeObject pgVector2_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    "pygame.math.Vector2",                    /* tp_name */
+    TYPE_HEAD(NULL, 0) "pygame.math.Vector2", /* tp_name */
     sizeof(pgVector),                         /* tp_basicsize */
     0,                                        /* tp_itemsize */
     /* Methods to implement standard operations */
@@ -3099,8 +3070,7 @@ static PyGetSetDef vector3_getsets[] = {
  ********************************/
 
 static PyTypeObject pgVector3_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    "pygame.math.Vector3",                    /* tp_name */
+    TYPE_HEAD(NULL, 0) "pygame.math.Vector3", /* tp_name */
     sizeof(pgVector),                         /* tp_basicsize */
     0,                                        /* tp_itemsize */
     /* Methods to implement standard operations */
@@ -3219,8 +3189,7 @@ static PyMethodDef vectoriter_methods[] = {
 };
 
 static PyTypeObject pgVectorIter_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    "pygame.math.VectorIterator",                    /* tp_name */
+    TYPE_HEAD(NULL, 0) "pygame.math.VectorIterator", /* tp_name */
     sizeof(vectoriter),                              /* tp_basicsize */
     0,                                               /* tp_itemsize */
     (destructor)vectoriter_dealloc,                  /* tp_dealloc */
@@ -3867,8 +3836,7 @@ static PyNumberMethods vector_elementwiseproxy_as_number = {
 };
 
 static PyTypeObject pgVectorElementwiseProxy_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    "pygame.math.VectorElementwiseProxy",                    /* tp_name */
+    TYPE_HEAD(NULL, 0) "pygame.math.VectorElementwiseProxy", /* tp_name */
     sizeof(vector_elementwiseproxy),                         /* tp_basicsize */
     0,                                                       /* tp_itemsize */
     /* Methods to implement standard operations */

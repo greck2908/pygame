@@ -65,15 +65,15 @@ no = (
 
 def TestCursor(arrow):
     hotspot = None
-    for y, line in enumerate(arrow):
-        for x, char in enumerate(line):
-            if char in ["x", ",", "O"]:
+    for y in range(len(arrow)):
+        for x in range(len(arrow[y])):
+            if arrow[y][x] in ["x", ",", "O"]:
                 hotspot = x, y
                 break
         if hotspot is not None:
             break
     if hotspot is None:
-        raise Exception("No hotspot specified for cursor '%s'!" % arrow)
+        raise Exception("No hotspot specified for cursor '%s'!" % cursorname)
     s2 = []
     for line in arrow:
         s2.append(line.replace("x", "X").replace(",", ".").replace("O", "o"))

@@ -38,11 +38,6 @@ The ``pygame.KEYDOWN`` event has the additional attributes ``unicode`` and
 The following is a list of all the constants (from :mod:`pygame.locals`) used to
 represent keyboard keys.
 
-Portability note: The integers for key constants differ between pygame 1 and 2.
-Always use key constants (``K_a``) rather than integers directly (``97``) so
-that your key handling code works well on both pygame 1 and pygame 2.
-
-
 ::
 
       pygame
@@ -208,7 +203,7 @@ can be assembled by bitwise-ORing them together.
       KMOD_META     left meta or right meta or both
       KMOD_CAPS     caps lock
       KMOD_NUM      num lock
-      KMOD_MODE     AltGr
+      KMOD_MODE     mode
 
 
 The modifier information is contained in the ``mod`` attribute of the
@@ -337,39 +332,13 @@ for ``KMOD_NONE``, which should be compared using equals ``==``). For example:
 
    .. ## pygame.key.name ##
 
-.. function:: key_code
-
-   | :sl:`get the key identifier from a key name`
-   | :sg:`key_code(name=string) -> int`
-
-   Get the key identifier code from the descriptive name of the key. This
-   returns an integer matching one of the K_* keycodes. For example:
-
-   ::
-
-        >>> pygame.key.key_code("return") == pygame.K_RETURN
-        True
-        >>> pygame.key.key_code("0") == pygame.K_0
-        True
-        >>> pygame.key.key_code("space") == pygame.K_SPACE
-        True
-
-   :raises ValueError: if the key name is not known.
-   :raises NotImplementedError: if used with SDL 1.
-
-   .. ## pygame.key.key_code ##
-
-   .. versionadded:: 2.0.0
-
-   .. ## pygame.key.key_code ##
-
 .. function:: start_text_input
 
-   | :sl:`start handling Unicode text input events`
+   | :sl:`start handling IME compositions`
    | :sg:`start_text_input() -> None`
 
    Start receiving ``pygame.TEXTEDITING`` and ``pygame.TEXTINPUT``
-   events.
+   events to handle IME.
 
    A ``pygame.TEXTEDITING`` event is received when an IME composition
    is started or changed. It contains the composition ``text``, ``length``,
@@ -378,7 +347,7 @@ for ``KMOD_NONE``, which should be compared using equals ``==``). For example:
    When the composition is committed (or non-IME input is received),
    a ``pygame.TEXTINPUT`` event is generated.
 
-   Text input events handling is on by default.
+   Normal ``pygame.TEXTINPUT`` events are not dependent on this.
 
    .. versionadded:: 2.0.0
 
@@ -386,13 +355,13 @@ for ``KMOD_NONE``, which should be compared using equals ``==``). For example:
 
 .. function:: stop_text_input
 
-   | :sl:`stop handling Unicode text input events`
+   | :sl:`stop handling IME compositions`
    | :sg:`stop_text_input() -> None`
 
    Stop receiving ``pygame.TEXTEDITING`` and ``pygame.TEXTINPUT``
-   events.
+   events to handle IME.
 
-   Text input events handling is on by default
+   Normal ``pygame.TEXTINPUT`` events are not dependent on this.
 
    .. versionadded:: 2.0.0
 
@@ -405,6 +374,8 @@ for ``KMOD_NONE``, which should be compared using equals ``==``). For example:
 
    This sets the rectangle used for typing with an IME.
    It controls where the candidate list will open, if supported.
+
+   Normal ``pygame.TEXTINPUT`` events are not dependent on this.
 
    .. versionadded:: 2.0.0
 

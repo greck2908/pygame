@@ -180,9 +180,9 @@ def main(*args):
 
             # Do both mechanics and screen update
             screen.fill((240, 220, 100))
-            for i, sprite in enumerate(sprites):
+            for i in range(len(sprites)):
                 for j in range(i + 1, len(sprites)):
-                    sprite.collide(sprites[j])
+                    sprites[i].collide(sprites[j])
             for s in sprites:
                 s.update(1)
                 if s.pos[0] < -s.surface.get_width() - 3:

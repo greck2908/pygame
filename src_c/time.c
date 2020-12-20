@@ -410,8 +410,7 @@ clock_str(PyObject *self)
 }
 
 static PyTypeObject PyClock_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    "Clock",                    /* name */
+    TYPE_HEAD(NULL, 0) "Clock", /* name */
     sizeof(PyClockObject),      /* basic size */
     0,                          /* itemsize */
     clock_dealloc,              /* dealloc */

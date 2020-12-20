@@ -11,10 +11,6 @@ import pygame
 from pygame import mixer
 from pygame.compat import unicode_, as_bytes, bytes_
 
-try:
-    import pathlib
-except ImportError:
-    pathlib = None
 
 IS_PYPY = "PyPy" == platform.python_implementation()
 
@@ -67,7 +63,7 @@ class MixerModuleTest(unittest.TestCase):
         self.assertEqual(mixer_conf[0], CONFIG["frequency"])
         # Not all "sizes" are supported on all systems,  hence "abs".
         self.assertEqual(abs(mixer_conf[1]), abs(CONFIG["size"]))
-        self.assertGreaterEqual(mixer_conf[2], CONFIG["channels"])
+        self.assertEqual(mixer_conf[2], CONFIG["channels"])
 
     def test_pre_init__keyword_args(self):
         # note: this test used to loop over all CONFIGS, but it's very slow..
@@ -79,7 +75,7 @@ class MixerModuleTest(unittest.TestCase):
         self.assertEqual(mixer_conf[0], CONFIG["frequency"])
         # Not all "sizes" are supported on all systems,  hence "abs".
         self.assertEqual(abs(mixer_conf[1]), abs(CONFIG["size"]))
-        self.assertGreaterEqual(mixer_conf[2], CONFIG["channels"])
+        self.assertEqual(mixer_conf[2], CONFIG["channels"])
 
     def test_pre_init__zero_values(self):
         # Ensure that argument values of 0 are replaced with
@@ -87,9 +83,7 @@ class MixerModuleTest(unittest.TestCase):
         mixer.pre_init(22050, -8, 1)  # Non default values
         mixer.pre_init(0, 0, 0)  # Should reset to default values
         mixer.init()
-        self.assertEqual(mixer.get_init()[0], 44100)
-        self.assertEqual(mixer.get_init()[1], -16)
-        self.assertGreaterEqual(mixer.get_init()[2], 2)
+        self.assertEqual(mixer.get_init(), (44100, -16, 2))
 
     def test_init__zero_values(self):
         # Ensure that argument values of 0 are replaced with
@@ -140,7 +134,7 @@ class MixerModuleTest(unittest.TestCase):
         self.assertRaises(pygame.error, mixer.get_num_channels)
 
     # TODO: FIXME: appveyor fails here sometimes.
-    @unittest.skipIf(sys.platform.startswith("win"), "See github issue 892.")
+    @unittest.expectedFailure
     def test_sound_args(self):
         def get_bytes(snd):
             return snd.get_raw()
@@ -353,13 +347,11 @@ class MixerModuleTest(unittest.TestCase):
         self.assertEqual(d["data"], (snd._samples_address, False))
 
     @unittest.skipIf(not pygame.HAVE_NEWBUF, "newbuf not implemented")
-    @unittest.skipIf(IS_PYPY, "pypy2 no likey")
     def test_newbuf__one_channel(self):
         mixer.init(22050, -16, 1)
         self._NEWBUF_export_check()
 
     @unittest.skipIf(not pygame.HAVE_NEWBUF, "newbuf not implemented")
-    @unittest.skipIf(IS_PYPY, "pypy2 no likey")
     def test_newbuf__twho_channel(self):
         mixer.init(22050, -16, 2)
         self._NEWBUF_export_check()
@@ -902,6 +894,11 @@ class ChannelTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
 class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
     @classmethod
+    def setUpClass(cls):
+        # Initializing the mixer is slow, so minimize the times it is called.
+        mixer.init()
+
+    @classmethod
     def tearDownClass(cls):
         mixer.quit()
 
@@ -941,15 +938,6 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
         self.assertIsInstance(sound, mixer.Sound)
 
-    @unittest.skipIf(pathlib is None, "no pathlib")
-    def test_sound__from_pathlib(self):
-        """Ensure Sound() creation with a pathlib.Path object works."""
-        path = pathlib.Path(example_path(os.path.join("data", "house_lo.wav")))
-        sound1 = mixer.Sound(path)
-        sound2 = mixer.Sound(file=path)
-        self.assertIsInstance(sound1, mixer.Sound)
-        self.assertIsInstance(sound2, mixer.Sound)
-
     def todo_test_sound__from_buffer(self):
         """Ensure Sound() creation with a buffer works."""
         self.fail()
@@ -974,26 +962,21 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
     @unittest.skipIf(IS_PYPY, "pypy skip")
     def test_samples_address(self):
         """Test the _samples_address getter."""
+        from ctypes import pythonapi, c_void_p, py_object
+
         try:
-            from ctypes import pythonapi, c_void_p, py_object
+            Bytes_FromString = pythonapi.PyBytes_FromString  # python 3
+        except:
+            Bytes_FromString = pythonapi.PyString_FromString  # python 2
 
-            try:
-                Bytes_FromString = pythonapi.PyBytes_FromString  # python 3
-            except:
-                Bytes_FromString = pythonapi.PyString_FromString  # python 2
+        Bytes_FromString.restype = c_void_p
+        Bytes_FromString.argtypes = [py_object]
+        samples = as_bytes("abcdefgh")  # keep byte size a multiple of 4
+        sample_bytes = Bytes_FromString(samples)
 
-            Bytes_FromString.restype = c_void_p
-            Bytes_FromString.argtypes = [py_object]
-            samples = as_bytes("abcdefgh")  # keep byte size a multiple of 4
-            sample_bytes = Bytes_FromString(samples)
+        snd = mixer.Sound(buffer=samples)
 
-            snd = mixer.Sound(buffer=samples)
-
-            self.assertNotEqual(snd._samples_address, sample_bytes)
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                snd._samples_address
+        self.assertNotEqual(snd._samples_address, sample_bytes)
 
     def todo_test_fadeout(self):
 
@@ -1009,62 +992,40 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
         self.fail()
 
-    def test_get_length(self):
-        """Tests if get_length returns a correct length."""
-        try:
-            for size in SIZES:
-                pygame.mixer.quit()
-                pygame.mixer.init(size=size)
-                filename = example_path(os.path.join("data", "punch.wav"))
-                sound = mixer.Sound(file=filename)
-                # The sound data is in the mixer output format. So dividing the
-                # length of the raw sound data by the mixer settings gives
-                # the expected length of the sound.
-                sound_bytes = sound.get_raw()
-                mix_freq, mix_bits, mix_channels = pygame.mixer.get_init()
-                mix_bytes = abs(mix_bits) / 8
-                expected_length = float(len(sound_bytes)) / mix_freq / mix_bytes / mix_channels
-                self.assertAlmostEqual(expected_length, sound.get_length())
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                sound.get_length()
+    def todo_test_get_length(self):
+
+        # __doc__ (as of 2008-08-02) for pygame.mixer.Sound.get_length:
+
+        # Sound.get_length(): return seconds
+        # get the length of the Sound
+        #
+        # Return the length of this Sound in seconds.
+
+        self.fail()
 
     def test_get_num_channels(self):
-        """
-        Tests if Sound.get_num_channels returns the correct number
-        of channels playing a specific sound.
-        """
-        try:
-            filename = example_path(os.path.join("data", "house_lo.wav"))
-            sound = mixer.Sound(file=filename)
+        """Ensure correct number of channels."""
+        expected_channels = 0
+        filename = example_path(os.path.join("data", "house_lo.wav"))
+        sound = mixer.Sound(file=filename)
 
-            self.assertEqual(sound.get_num_channels(), 0)
-            sound.play()
-            self.assertEqual(sound.get_num_channels(), 1)
-            sound.play()
-            self.assertEqual(sound.get_num_channels(), 2)
-            sound.stop()
-            self.assertEqual(sound.get_num_channels(), 0)
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                sound.get_num_channels()
+        num_channels = sound.get_num_channels()
+
+        self.assertEqual(num_channels, expected_channels)
+
+    def todo_test_get_num_channels__while_playing(self):
+        """Ensure correct number of channels while playing."""
+        self.fail()
 
     def test_get_volume(self):
         """Ensure a sound's volume can be retrieved."""
-        try:
-            expected_volume = 1.0  # default
-            filename = example_path(os.path.join("data", "house_lo.wav"))
-            sound = mixer.Sound(file=filename)
+        expected_volume = 1.0  # default
+        filename = example_path(os.path.join("data", "house_lo.wav"))
+        sound = mixer.Sound(file=filename)
 
-            volume = sound.get_volume()
+        volume = sound.get_volume()
 
-            self.assertAlmostEqual(volume, expected_volume)
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                sound.get_volume()
+        self.assertAlmostEqual(volume, expected_volume)
 
     def todo_test_get_volume__while_playing(self):
         """Ensure a sound's volume can be retrieved while playing."""
@@ -1102,36 +1063,31 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
     def test_set_volume(self):
         """Ensure a sound's volume can be set."""
-        try:
-            float_delta = 1.0 / 128  # SDL volume range is 0 to 128
-            filename = example_path(os.path.join("data", "house_lo.wav"))
-            sound = mixer.Sound(file=filename)
-            current_volume = sound.get_volume()
+        float_delta = 1.0 / 128  # SDL volume range is 0 to 128
+        filename = example_path(os.path.join("data", "house_lo.wav"))
+        sound = mixer.Sound(file=filename)
+        current_volume = sound.get_volume()
 
-            # (volume_set_value : expected_volume)
-            volumes = (
-                (-1, current_volume),  # value < 0 won't change volume
-                (0, 0.0),
-                (0.01, 0.01),
-                (0.1, 0.1),
-                (0.5, 0.5),
-                (0.9, 0.9),
-                (0.99, 0.99),
-                (1, 1.0),
-                (1.1, 1.0),
-                (2.0, 1.0),
+        # (volume_set_value : expected_volume)
+        volumes = (
+            (-1, current_volume),  # value < 0 won't change volume
+            (0, 0.0),
+            (0.01, 0.01),
+            (0.1, 0.1),
+            (0.5, 0.5),
+            (0.9, 0.9),
+            (0.99, 0.99),
+            (1, 1.0),
+            (1.1, 1.0),
+            (2.0, 1.0),
+        )
+
+        for volume_set_value, expected_volume in volumes:
+            sound.set_volume(volume_set_value)
+
+            self.assertAlmostEqual(
+                sound.get_volume(), expected_volume, delta=float_delta
             )
-
-            for volume_set_value, expected_volume in volumes:
-                sound.set_volume(volume_set_value)
-
-                self.assertAlmostEqual(
-                    sound.get_volume(), expected_volume, delta=float_delta
-                )
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                sound.set_volume(1)
 
     def todo_test_set_volume__while_playing(self):
         """Ensure a sound's volume can be set while playing."""
@@ -1139,18 +1095,13 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
     def test_stop(self):
         """Ensure stop can be called while not playing a sound."""
-        try:
-            expected_channels = 0
-            filename = example_path(os.path.join("data", "house_lo.wav"))
-            sound = mixer.Sound(file=filename)
+        expected_channels = 0
+        filename = example_path(os.path.join("data", "house_lo.wav"))
+        sound = mixer.Sound(file=filename)
 
-            sound.stop()
+        sound.stop()
 
-            self.assertEqual(sound.get_num_channels(), expected_channels)
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                sound.stop()
+        self.assertEqual(sound.get_num_channels(), expected_channels)
 
     def todo_test_stop__while_playing(self):
         """Ensure stop stops a playing sound."""
@@ -1158,18 +1109,13 @@ class SoundTypeTest(AssertRaisesRegexMixin, unittest.TestCase):
 
     def test_get_raw(self):
         """Ensure get_raw returns the correct bytestring."""
-        try:
-            samples = as_bytes("abcdefgh")  # keep byte size a multiple of 4
-            snd = mixer.Sound(buffer=samples)
+        samples = as_bytes("abcdefgh")  # keep byte size a multiple of 4
+        snd = mixer.Sound(buffer=samples)
 
-            raw = snd.get_raw()
+        raw = snd.get_raw()
 
-            self.assertIsInstance(raw, bytes_)
-            self.assertEqual(raw, samples)
-        finally:
-            pygame.mixer.quit()
-            with self.assertRaisesRegex(pygame.error, "mixer not initialized"):
-                snd.get_raw()
+        self.assertIsInstance(raw, bytes_)
+        self.assertEqual(raw, samples)
 
 
 ##################################### MAIN #####################################

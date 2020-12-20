@@ -6,15 +6,18 @@ _is_init = 0
 def init():
     global list_cameras, Camera, colorspace, _is_init
 
-    import os, sys
+
+    import os,sys
 
     use_opencv = False
     use_vidcapture = False
     use__camera = True
 
+
     if sys.platform == 'win32':
         use_vidcapture = True
         use__camera = False
+
     elif "linux" in sys.platform:
         use__camera = True
     elif "darwin" in sys.platform:
@@ -22,12 +25,16 @@ def init():
     else:
         use_opencv = True
 
+
+
     # see if we have any user specified defaults in environments.
     camera_env = os.environ.get("PYGAME_CAMERA", "")
     if camera_env == "opencv":
         use_opencv = True
     if camera_env == "vidcapture":
         use_vidcapture = True
+
+
 
     # select the camera module to import here.
 
@@ -63,6 +70,8 @@ def init():
             list_cameras = _camera_vidcapture.list_cameras
             Camera = _camera_vidcapture.Camera
 
+
+
     _is_init = 1
 
 
@@ -76,7 +85,6 @@ def _check_init():
     if not _is_init:
         raise ValueError("Need to call camera.init() before using.")
 
-
 def list_cameras():
     """
     """
@@ -86,7 +94,7 @@ def list_cameras():
 
 class Camera:
 
-    def __init__(self, device=0, size=(320, 200), mode="RGB"):
+    def __init__(self, device =0, size = (320, 200), mode = "RGB"):
         """
         """
         _check_init()
@@ -113,13 +121,14 @@ class Camera:
         """
         """
 
-    def get_image(self, dest_surf=None):
+    def get_image(self, dest_surf = None):
         """
         """
 
-    def get_surface(self, dest_surf=None):
+    def get_surface(self, dest_surf = None):
         """
         """
+
 
 
 if __name__ == "__main__":
@@ -130,3 +139,6 @@ if __name__ == "__main__":
     #pygame.camera.Camera = Camera
     #pygame.camera.list_cameras = list_cameras
     pygame.examples.camera.main()
+
+    
+

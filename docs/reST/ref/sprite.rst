@@ -222,7 +222,7 @@ Sprites are not thread safe. So lock them yourself if using threads.
       | :sg:`sprites() -> sprite_list`
 
       Return a list of all the Sprites this group contains. You can also get an
-      iterator from the group, but you cannot iterate over a Group while
+      iterator from the group, but you cannot iterator over a Group while
       modifying it.
 
       .. ## Group.sprites ##
@@ -266,7 +266,7 @@ Sprites are not thread safe. So lock them yourself if using threads.
    .. method:: has
 
       | :sl:`test if a Group contains Sprites`
-      | :sg:`has(*sprites) -> bool`
+      | :sg:`has(*sprites) -> None`
 
       Return True if the Group contains all of the given sprites. This is
       similar to using the "in" operator on the Group ("if sprite in group:
@@ -405,7 +405,7 @@ Sprites are not thread safe. So lock them yourself if using threads.
    You can set the default layer through kwargs using 'default_layer' and an
    integer for the layer. The default layer is 0.
 
-   If the sprite you add has an attribute _layer then that layer will be used.
+   If the sprite you add has an attribute layer then that layer will be used.
    If the \**kwarg contains 'layer' then the sprites passed will be added to
    that layer (overriding the ``sprite.layer`` attribute). If neither sprite
    has attribute layer nor \**kwarg then the default layer is used to add the
@@ -636,8 +636,6 @@ Sprites are not thread safe. So lock them yourself if using threads.
 
       Default is 1000./80 where 80 is the fps I want to switch to full screen
       mode.  This method's name is a typo and should be fixed.
-
-      :raises TypeError: if ``time_ms`` is not int or float
 
       .. ## LayeredDirty.set_timing_treshold ##
 

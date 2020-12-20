@@ -41,16 +41,16 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pygame'
-copyright = u'2000-2020, pygame developers'
+copyright = u'2011-2019, pygame developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = '2.0.1.dev1'
+version = '2.0.0.dev7'
 # The full version, including alpha/beta/rc tags.
-release = '2.0.1.dev1'
+release = '2.0.0.dev7'
 
 # Format strings for the version directives
 versionadded_format = 'New in pygame %s'
@@ -223,4 +223,5 @@ headers_filename_sfx = '_doc'
 smartquotes = False
 
 edit_on_github_project = 'pygame/pygame'
-edit_on_github_branch = 'main'
+edit_on_github_branch = 'master'
+

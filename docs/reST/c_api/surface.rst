@@ -29,7 +29,7 @@ Header file: src_c/include/pygame.h
    Will return false if *x* is a subclass of `Surface`.
    This is a macro. No check is made that *x* is not *NULL*.
 
-.. c:function:: pgSurfaceObject* pgSurface_New(SDL_Surface *s)
+.. c:function:: PyObject* pgSurface_New(SDL_Surface *s)
 
    Return a new new pygame surface instance for SDL surface *s*.
    Return *NULL* on error.
@@ -51,7 +51,7 @@ Header file: src_c/include/pygame.h
    ``PYGAME_BLEND_SUB``, ``PYGAME_BLEND_MULT``, ``PYGAME_BLEND_MIN``,
    ``PYGAME_BLEND_MAX``, ``PYGAME_BLEND_RGBA_ADD``, ``PYGAME_BLEND_RGBA_SUB``,
    ``PYGAME_BLEND_RGBA_MULT``, ``PYGAME_BLEND_RGBA_MIN``,
-   ``PYGAME_BLEND_RGBA_MAX``, ``PYGAME_BLEND_ALPHA_SDL2`` and ``PYGAME_BLEND_PREMULTIPLIED``.
+   ``PYGAME_BLEND_RGBA_MAX``, and ``PYGAME_BLEND_PREMULTIPLIED``.
    Argument *dstrect* is updated to the actual area on *dstobj* affected
    by the blit.
 

@@ -6,33 +6,27 @@
 # To configure, compile, install, just run this script.
 #     python setup.py install
 
-import io
-
-with io.open('README.rst', encoding='utf-8') as readme:
-    LONG_DESCRIPTION = readme.read()
+DESCRIPTION = """Pygame is a Python wrapper module for the
+SDL multimedia library. It contains python functions and classes
+that will allow you to use SDL's support for playing cdroms,
+audio and video output, and keyboard, mouse and joystick input."""
 
 EXTRAS = {}
 
 METADATA = {
     "name":             "pygame",
-    "version":          "2.0.1.dev1",
+    "version":          "2.0.0.dev7",
     "license":          "LGPL",
     "url":              "https://www.pygame.org",
     "author":           "A community project.",
     "author_email":     "pygame@pygame.org",
     "description":      "Python Game Development",
-    "long_description": LONG_DESCRIPTION,
+    "long_description": DESCRIPTION,
 }
 
 import re
 import sys
 import os
-
-# just import these always and fail early if not present
-import distutils
-from setuptools import setup
-
-IS_PYPY = '__pypy__' in sys.builtin_module_names
 
 def compilation_help():
     """ On failure point people to a web page for help.
@@ -58,7 +52,8 @@ def compilation_help():
     default = 'https://www.pygame.org/wiki/Compilation'
     url = help_urls.get(the_system, default)
 
-    if IS_PYPY:
+    is_pypy = '__pypy__' in sys.builtin_module_names
+    if is_pypy:
         url += '\n    https://www.pygame.org/wiki/CompilePyPy'
 
     print ('\n---')
@@ -73,17 +68,6 @@ def compilation_help():
 if not hasattr(sys, 'version_info') or sys.version_info < (2,7):
     compilation_help()
     raise SystemExit("Pygame requires Python version 2.7 or above.")
-if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
-    compilation_help()
-    raise SystemExit("Pygame requires Python3 version 3.5 or above.")
-if IS_PYPY and sys.pypy_version_info < (7,):
-    raise SystemExit("Pygame requires PyPy version 7.0.0 above, compatible with CPython 2.7 or CPython 3.5+")
-
-def consume_arg(name):
-    if name in sys.argv:
-        sys.argv.remove(name)
-        return True
-    return False
 
 #get us to the correct directory
 path = os.path.split(os.path.abspath(sys.argv[0]))[0]
@@ -92,7 +76,7 @@ os.chdir(path)
 #                       "-Wcast-align -Wconversion -Wstrict-prototypes " + \
 #                       "-Wmissing-prototypes -Wmissing-declarations " + \
 #                       "-Wnested-externs -Wshadow -Wredundant-decls"
-if consume_arg("-warnings"):
+if "-warnings" in sys.argv:
     os.environ["CFLAGS"] = "-W -Wimplicit-int " + \
                        "-Wimplicit-function-declaration " + \
                        "-Wimplicit -Wmain -Wreturn-type -Wunused -Wswitch " + \
@@ -102,47 +86,9 @@ if consume_arg("-warnings"):
                        "-Wconversion -Wstrict-prototypes " + \
                        "-Wmissing-prototypes -Wmissing-declarations " + \
                        "-Wnested-externs -Wshadow -Wredundant-decls"
+    sys.argv.remove ("-warnings")
 
-if consume_arg('-pygame-ci'):
-    cflags = os.environ.get('CFLAGS', '')
-    if cflags:
-        cflags += ' '
-    cflags += '-Werror=nested-externs -Werror=switch -Werror=implicit ' + \
-              '-Werror=implicit-function-declaration -Werror=return-type ' + \
-              '-Werror=implicit-int -Werror=main -Werror=pointer-arith ' + \
-              '-Werror=format-security -Werror=uninitialized ' + \
-              '-Werror=trigraphs -Werror=parentheses -Werror=unused-value ' + \
-              '-Werror=cast-align -Werror=int-conversion ' + \
-              '-Werror=incompatible-pointer-types'
-    os.environ['CFLAGS'] = cflags
-
-# For python 2 we remove the -j options.
-if sys.version_info[0] < 3:
-    # Used for parallel builds with setuptools. Not supported by py2.
-    [consume_arg('-j%s' % x) for x in range(32)]
-
-
-STRIPPED=False
-
-# STRIPPED builds don't have developer resources like docs or tests
-
-if "PYGAME_ANDROID" in os.environ:
-    # test cases and docs are useless inside an APK
-    STRIPPED=True
-
-if consume_arg('-stripped'):
-    STRIPPED=True
-
-enable_arm_neon = False
-if consume_arg('-enable-arm-neon'):
-    enable_arm_neon = True
-    cflags = os.environ.get('CFLAGS', '')
-    if cflags:
-        cflags += ' '
-    cflags += '-mfpu=neon'
-    os.environ['CFLAGS'] = cflags
-
-if consume_arg('cython'):
+if 'cython' in sys.argv:
     # compile .pyx files
     # So you can `setup.py cython` or `setup.py cython install`
     try:
@@ -213,10 +159,13 @@ if consume_arg('cython'):
         kwargs['progress'] = '[{}/{}] '.format(i + 1, count)
         cythonize_one(**kwargs)
 
+    sys.argv.remove('cython')
 
 AUTO_CONFIG = False
-if consume_arg('-auto'):
+if '-auto' in sys.argv:
     AUTO_CONFIG = True
+    sys.argv.remove('-auto')
+
 
 import os.path, glob, stat, shutil
 import distutils.sysconfig
@@ -227,6 +176,21 @@ from distutils.command.sdist import sdist
 
 
 revision = ''
+
+# Python 3.0 patch
+if sys.version_info[0:2] == (3, 0):
+    import distutils.version
+    def _cmp(x, y):
+        try:
+            if x < y:
+                return -1
+            elif x == y:
+                return 0
+            return 1
+        except TypeError:
+            return NotImplemented
+    distutils.version.cmp = _cmp
+    del _cmp
 
 def add_datafiles(data_files, dest_dir, pattern):
     """Add directory structures to data files according to a pattern"""
@@ -245,18 +209,17 @@ def add_datafiles(data_files, dest_dir, pattern):
             data_files.append((root_dest_path, files))
     do_directory(dest_dir, src_dir, elements)
 
-# # allow optionally using setuptools for bdist_egg.
-# if consume_arg("-setuptools") in sys.argv:
-#     from setuptools import setup
-#     sys.argv.remove ("-setuptools")
-
-# we need to eat this argument in to distutils doesn't trip over it
-consume_arg("-setuptools")
+# allow optionally using setuptools for bdist_egg.
+if "-setuptools" in sys.argv:
+    from setuptools import setup
+    sys.argv.remove ("-setuptools")
+from setuptools import setup
 
 
 # NOTE: the bdist_mpkg_support is for darwin.
 try:
     import bdist_mpkg_support
+    from setuptools import setup
 except ImportError:
     pass
 else:
@@ -270,35 +233,12 @@ else:
 #headers to install
 headers = glob.glob(os.path.join('src_c', '*.h'))
 headers.remove(os.path.join('src_c', 'scale.h'))
-headers.append(os.path.join('src_c', 'include'))
-
-import distutils.command.install_headers
-
-# monkey patch distutils header install to copy over directories
-def run_install_headers(self):
-    headers = self.distribution.headers
-    if not headers:
-        return
-
-    self.mkpath(self.install_dir)
-    for header in headers:
-        if os.path.isdir(header):
-            destdir=os.path.join(self.install_dir, os.path.basename(header))
-            self.mkpath(destdir)
-            for entry in os.listdir(header):
-                header1=os.path.join(header, entry)
-                if not os.path.isdir(header1):
-                    (out, _) = self.copy_file(header1, destdir)
-                    self.outfiles.append(out)
-        else:
-            (out, _) = self.copy_file(header, self.install_dir)
-            self.outfiles.append(out)
-
-distutils.command.install_headers.install_headers.run = run_install_headers
 
 # option for not installing the headers.
-if consume_arg("-noheaders"):
+if "-noheaders" in sys.argv:
     headers = []
+    sys.argv.remove ("-noheaders")
+
 
 #sanity check for any arguments
 if len(sys.argv) == 1 and sys.stdout.isatty():
@@ -342,16 +282,35 @@ perhaps make a clean copy from "Setup.in".""")
     compilation_help()
     raise
 
-# Only define the ARM_NEON defines if they have been enabled at build time.
-if enable_arm_neon:
-    for e in extensions:
-        e.define_macros.append(('PG_ENABLE_ARM_NEON', '1'))
+
+#decide whether or not to enable new buffer protocol support
+enable_newbuf = False
+if sys.version_info >= (2, 6, 0):
+    try:
+        sys.pypy_version_info
+    except AttributeError:
+        enable_newbuf = True
+
+if enable_newbuf:
+    enable_newbuf_value = '1'
+else:
+    enable_newbuf_value = '0'
+for e in extensions:
+    e.define_macros.append(('ENABLE_NEWBUF', enable_newbuf_value))
+
+#if new buffer protocol support is disabled then remove the testing framework
+if not enable_newbuf:
+    posn = None
+    for i, e in enumerate(extensions):
+        if e.name == 'newbuffer':
+            posn = i
+    if (posn is not None):
+        del extensions[posn]
 
 # if not building font, try replacing with ftfont
 alternate_font = os.path.join('src_py', 'font.py')
 if os.path.exists(alternate_font):
     os.remove(alternate_font)
-
 have_font = False
 have_freetype = False
 for e in extensions:
@@ -372,27 +331,15 @@ data_files = [('pygame', pygame_data_files)]
 # pygame_data_files.append('readme.html')
 # pygame_data_files.append('install.html')
 
-add_stubs = True
 # add *.pyi files into distribution directory
-if add_stubs:
-    pygame_data_files.append(os.path.join('buildconfig', 'pygame-stubs', 'py.typed'))
-    type_files = glob.glob(os.path.join('buildconfig', 'pygame-stubs', '*.pyi'))
-    for type_file in type_files:
-        pygame_data_files.append(type_file)
-    _sdl2 = glob.glob(os.path.join('buildconfig', 'pygame-stubs', '_sdl2', '*.pyi'))
-    if _sdl2:
-        _sdl2_data_files = []
-        data_files.append(('pygame/_sdl2', _sdl2_data_files))
-        for type_file in _sdl2:
-            _sdl2_data_files.append(type_file)
-
+# type_files = glob.glob(os.path.join('buildconfig', 'pygame-stubs', '*.pyi'))
+# for type_file in type_files:
+#     pygame_data_files.append(type_file)
 
 #add non .py files in lib directory
 for f in glob.glob(os.path.join('src_py', '*')):
     if not f[-3:] == '.py' and not f[-4:] == '.doc' and os.path.isfile(f):
         pygame_data_files.append(f)
-
-# We don't need to deploy tests, example code, or docs inside a game
 
 #tests/fixtures
 add_datafiles(data_files, 'pygame/tests',
@@ -405,7 +352,19 @@ add_datafiles(data_files, 'pygame/tests',
 
 #examples
 add_datafiles(data_files, 'pygame/examples',
-              ['examples', ['README.rst', ['data', ['*']]]])
+              ['examples',
+                  ['readme.rst',
+                   ['data',
+                       ['*']],
+                   ['macosx',
+                       ['*.py',
+                        ['aliens_app_example',
+                            ['*.py',
+                             'README.txt',
+                             ['English.lproj',
+                                 ['aliens.icns',
+                                  ['MainMenu.nib',
+                                      ['*']]]]]]]]]])
 
 #docs
 add_datafiles(data_files, 'pygame/docs',
@@ -479,22 +438,14 @@ def write_version_module(pygame_version, revision):
         header = header_file.read()
     with open(os.path.join('src_py', 'version.py'), 'w') as version_file:
         version_file.write(header)
-        version_file.write('ver = "' + pygame_version + '"  # pylint: disable=invalid-name\n')
+        version_file.write('ver = "' + pygame_version + '"\n')
         version_file.write('vernum = PygameVersion(%s)\n' % vernum)
-        version_file.write('rev = "' + revision + '"  # pylint: disable=invalid-name\n')
-        version_file.write('\n__all__ = ["SDL", "ver", "vernum", "rev"]\n')
+        version_file.write('rev = "' + revision + '"\n')
 
 write_version_module(METADATA['version'], revision)
 
 #required. This will be filled if doing a Windows build.
 cmdclass = {}
-
-def add_command(name):
-    def decorator(command):
-        assert issubclass(command, distutils.cmd.Command)
-        cmdclass[name]=command
-        return command
-    return decorator
 
 #try to find DLLs and copy them too  (only on windows)
 if sys.platform == 'win32':
@@ -545,58 +496,6 @@ if sys.platform == 'win32':
         else:
             pygame_data_files.append(f)
 
-
-    if '-enable-msvc-analyze' in sys.argv:
-        # calculate the MSVC compiler version as an int
-        msc_pos = sys.version.find('MSC v.')
-        msc_ver = 1900
-        if msc_pos != -1:
-            msc_ver = int(sys.version[msc_pos + 6:msc_pos + 10])
-        print ('Analyzing with MSC_VER =', msc_ver)
-
-        # excluding system headers from analyze out put was only added after MSCV_VER 1913
-        if msc_ver >= 1913:
-            os.environ['CAExcludePath'] = 'C:\\Program Files (x86)\\'
-            for e in extensions:
-                e.extra_compile_args += ['/analyze', '/experimental:external',
-                                         '/external:W0', '/external:env:CAExcludePath' ]
-        else:
-            for e in extensions:
-                e.extra_compile_args += ['/analyze']
-
-    def has_flag(compiler, flagname):
-        """
-        Adapted from here: https://github.com/pybind/python_example/blob/master/setup.py#L37
-        """
-        from distutils.errors import CompileError
-        import tempfile
-        root_drive = os.path.splitdrive(sys.executable)[0] + '\\'
-        with tempfile.NamedTemporaryFile('w', suffix='.cpp', delete=False) as f:
-            f.write('int main (int argc, char **argv) { return 0; }')
-            fname = f.name
-        try:
-            compiler.compile([fname], output_dir=root_drive, extra_postargs=[flagname])
-        except CompileError:
-            return False
-        else:
-            try:
-                base_file = os.path.splitext(fname)[0]
-                obj_file = base_file + '.obj'
-                os.remove(obj_file)
-            except OSError:
-                pass
-        finally:
-            try:
-                os.remove(fname)
-            except OSError:
-                pass
-        return True
-
-    # filter flags, returns list of accepted flags
-    def flag_filter(compiler, *flags):
-        return [flag for flag in flags if has_flag(compiler, flag)]
-
-    @add_command('build_ext')
     class WinBuildExt(build_ext):
         """This build_ext sets necessary environment variables for MinGW"""
 
@@ -608,13 +507,7 @@ if sys.platform == 'win32':
                 __sdl_lib_dir = e.library_dirs[0].replace('/', os.sep)
                 break
 
-        def build_extensions(self):
-            # Add supported optimisations flags to reduce code size with MSVC
-            opts = flag_filter(self.compiler, "/GF", "/Gy")
-            for extension in extensions:
-                extension.extra_compile_args += opts
-
-            build_ext.build_extensions(self)
+    cmdclass['build_ext'] = WinBuildExt
 
     # Add the precompiled smooth scale MMX functions to transform.
     def replace_scale_mmx():
@@ -644,7 +537,6 @@ for e in extensions[:]:
 #data installer with improved intelligence over distutils
 #data files are copied into the project directory instead
 #of willy-nilly
-@add_command('install_data')
 class smart_install_data(install_data):
     def run(self):
         #need to change self.install_dir to the actual library dir
@@ -652,13 +544,16 @@ class smart_install_data(install_data):
         self.install_dir = getattr(install_cmd, 'install_lib')
         return install_data.run(self)
 
+cmdclass['install_data'] = smart_install_data
 
-@add_command('sdist')
+
 class OurSdist(sdist):
     def initialize_options(self):
         sdist.initialize_options(self)
         # we do not want MANIFEST.in to appear in the root cluttering up things.
         self.template = os.path.join('buildconfig', 'MANIFEST.in')
+
+cmdclass['sdist'] = OurSdist
 
 
 if "bdist_msi" in sys.argv:
@@ -667,7 +562,6 @@ if "bdist_msi" in sys.argv:
     from distutils.command import bdist_msi
     import msilib
 
-    @add_command('bdist_msi')
     class bdist_msi_overwrite_on_install(bdist_msi.bdist_msi):
         def run(self):
             bdist_msi.bdist_msi.run(self)
@@ -697,10 +591,16 @@ if "bdist_msi" in sys.argv:
                 fullname += '-hg_' + revision
             return bdist_msi.bdist_msi.get_installer_filename(self, fullname)
 
+    cmdclass['bdist_msi'] = bdist_msi_overwrite_on_install
+
+
+
+
+
+
 
 # test command.  For doing 'python setup.py test'
 
-@add_command('test')
 class TestCommand(Command):
     user_options = [ ]
 
@@ -717,9 +617,9 @@ class TestCommand(Command):
         import subprocess
         return subprocess.call([sys.executable, os.path.join('test', '__main__.py')])
 
+cmdclass['test'] = TestCommand
 
 
-@add_command('docs')
 class DocsCommand(Command):
     """ For building the pygame documentation with `python setup.py docs`.
 
@@ -752,8 +652,20 @@ class DocsCommand(Command):
             print(docs_help)
             raise
 
+cmdclass['docs'] = DocsCommand
+
+
+
 # Prune empty file lists.
 date_files = [(path, files) for path, files in data_files if files]
+
+
+
+
+
+
+
+
 
 
 #finally,
@@ -777,40 +689,18 @@ PACKAGEDATA = {
                        'pygame.tests.run_tests__tests.timeout',
                        'pygame.tests.run_tests__tests.everything',
                        'pygame.docs',
-                       'pygame.examples',
-                       'pygame.__pyinstaller'],
+                       'pygame.examples'],
        "package_dir": {'pygame': 'src_py',
                        'pygame._sdl2': 'src_py/_sdl2',
                        'pygame.threads': 'src_py/threads',
                        'pygame.tests': 'test',
                        'pygame.docs': 'docs',
-                       'pygame.examples': 'examples',
-                       'pygame.__pyinstaller': 'src_py/__pyinstaller'},
+                       'pygame.examples': 'examples'},
        "headers":     headers,
        "ext_modules": extensions,
        "data_files":  data_files,
        "zip_safe":  False,
 }
-if STRIPPED:
-    pygame_data_files = []
-    data_files = [('pygame', pygame_data_files)]
-    for f in glob.glob(os.path.join('src_py', '*')):
-        if not f[-3:] == '.py' and not f[-4:] == '.doc' and os.path.isfile(f):
-            pygame_data_files.append(f)
-
-    PACKAGEDATA = {
-    "cmdclass":    cmdclass,
-    "packages":    ['pygame',
-                    'pygame.threads',
-                    'pygame._sdl2'],
-    "package_dir": {'pygame': 'src_py',
-                    'pygame._sdl2': 'src_py/_sdl2',
-                    'pygame.threads': 'src_py/threads'},
-    "ext_modules": extensions,
-    "zip_safe":  False,
-    "data_files": data_files
-}
-
 PACKAGEDATA.update(METADATA)
 PACKAGEDATA.update(EXTRAS)
 

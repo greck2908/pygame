@@ -1,10 +1,7 @@
-#!/bin/bash
-set -e -x
-
 # build the wheels.
 cd buildconfig/manylinux-build
-make pull pull-manylinux wheels wheels-manylinux
+make pull
+make wheels
+mkdir -p ../../dist/
+mv wheelhouse/*.whl ../../dist/
 cd ../..
-
-mkdir -p dist/
-cp buildconfig/manylinux-build/wheelhouse/*.whl dist/

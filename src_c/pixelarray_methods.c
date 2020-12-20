@@ -149,7 +149,7 @@ _make_surface(pgPixelArrayObject *array, PyObject *args)
     Py_ssize_t dim1 = array->shape[1] ? array->shape[1] : 1;
     Py_ssize_t stride0 = array->strides[0];
     Py_ssize_t stride1 = array->strides[1];
-    pgSurfaceObject *new_surface;
+    PyObject *new_surface;
     SDL_Surface *temp_surf;
     SDL_Surface *new_surf;
     Py_ssize_t new_stride0;
@@ -274,7 +274,7 @@ _make_surface(pgPixelArrayObject *array, PyObject *args)
     if (SDL_MUSTLOCK(new_surf) == 0) {
         SDL_UnlockSurface(new_surf);
     }
-    return (PyObject *)new_surface;
+    return new_surface;
 }
 
 static int
@@ -942,7 +942,7 @@ _compare(pgPixelArrayObject *array, PyObject *args, PyObject *kwds)
                     GET_PIXELVALS(r1, g1, b1, a1,
                                   (Uint32)*pixel_p, format, ppa);
                     GET_PIXELVALS(r2, g2, b2, a2,
-                                  (Uint32)*other_pixel_p, other_format, other_ppa);
+                                  (Uint32)*pixel_p, other_format, other_ppa);
                     if (COLOR_DIFF_RGB(wr, wg, wb, r1, g1, b1, r2, g2, b2) <=
                         distance) {
                         *pixel_p = (Uint16)white;
@@ -1046,7 +1046,7 @@ _compare(pgPixelArrayObject *array, PyObject *args, PyObject *kwds)
                 if (distance != 0.0) {
                     GET_PIXELVALS(r1, g1, b1, a1, *pixel_p, format, ppa);
                     GET_PIXELVALS(r2, g2, b2, a2,
-                                  *other_pixel_p, other_format, other_ppa);
+                                  *pixel_p, other_format, other_ppa);
                     if (COLOR_DIFF_RGB(wr, wg, wb, r1, g1, b1, r2, g2, b2) <=
                         distance) {
                         *pixel_p = white;

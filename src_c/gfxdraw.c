@@ -1131,9 +1131,5 @@ MODINIT_DEFINE(gfxdraw)
                             DOC_PYGAMEGFXDRAW);
 #endif
 
-    if (module == NULL) {
-        MODINIT_ERROR;
-    }
-
     MODINIT_RETURN(module);
 }

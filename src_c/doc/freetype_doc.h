@@ -11,7 +11,7 @@
 #define DOC_PYGAMEFREETYPESETDEFAULTRESOLUTION "set_default_resolution([resolution])\nSet the default pixel size in dots per inch for the module"
 #define DOC_PYGAMEFREETYPESYSFONT "SysFont(name, size, bold=False, italic=False) -> Font\ncreate a Font object from the system fonts"
 #define DOC_PYGAMEFREETYPEGETDEFAULTFONT "get_default_font() -> string\nGet the filename of the default font"
-#define DOC_PYGAMEFREETYPEFONT "Font(file, size=0, font_index=0, resolution=0, ucs4=False) -> Font\nFont(pathlib.Path) -> Font\nCreate a new Font instance from a supported font file."
+#define DOC_PYGAMEFREETYPEFONT "Font(file, size=0, font_index=0, resolution=0, ucs4=False) -> Font\nCreate a new Font instance from a supported font file."
 #define DOC_FONTNAME "name -> string\nProper font name."
 #define DOC_FONTPATH "path -> unicode\nFont file path"
 #define DOC_FONTSIZE "size -> float\nsize -> (float, float)\nThe default point size used in rendering"
@@ -45,7 +45,6 @@
 #define DOC_FONTVERTICAL "vertical -> bool\nFont vertical mode"
 #define DOC_FONTROTATION "rotation -> int\ntext rotation in degrees counterclockwise"
 #define DOC_FONTFGCOLOR "fgcolor -> Color\ndefault foreground color"
-#define DOC_FONTBGCOLOR "bgcolor -> Color\ndefault background color"
 #define DOC_FONTORIGIN "origin -> bool\nFont render to text origin mode"
 #define DOC_FONTPAD "pad -> bool\npadded boundary mode"
 #define DOC_FONTUCS4 "ucs4 -> bool\nEnable UCS-4 mode"
@@ -106,7 +105,6 @@ Get the filename of the default font
 
 pygame.freetype.Font
  Font(file, size=0, font_index=0, resolution=0, ucs4=False) -> Font
- Font(pathlib.Path) -> Font
 Create a new Font instance from a supported font file.
 
 pygame.freetype.Font.name
@@ -242,10 +240,6 @@ text rotation in degrees counterclockwise
 pygame.freetype.Font.fgcolor
  fgcolor -> Color
 default foreground color
-
-pygame.freetype.Font.bgcolor
- bgcolor -> Color
-default background color
 
 pygame.freetype.Font.origin
  origin -> bool

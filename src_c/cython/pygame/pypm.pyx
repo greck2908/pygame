@@ -5,12 +5,9 @@
 # harrison@media.mit.edu
 # written in Pyrex
 
-# cython: language_level=2
-
 __version__ = "0.0.6"
 
 import array
-import sys
 
 # CHANGES:
 
@@ -135,7 +132,6 @@ cdef extern from "portmidi.h":
     PmError Pm_WriteSysEx(PortMidiStream *stream, PmTimestamp when,
                           unsigned char *msg)
 
-
 cdef extern from "porttime.h":
     ctypedef enum PtError:
         ptNoError = 0,
@@ -149,7 +145,6 @@ cdef extern from "porttime.h":
     PtError Pt_Start(int resolution, PtCallback *callback, void *userData)
     PtTimestamp Pt_Time()
 
-cdef long _pypm_initialized
 
 def Initialize():
     """Initialize PortMidi library.
@@ -161,7 +156,6 @@ def Initialize():
     Pm_Initialize()
     # equiv to TIME_START: start timer w/ ms accuracy
     Pt_Start(1, NULL, NULL)
-    _pypm_initialized = 1
 
 def Terminate():
     """Terminate use of PortMidi library.
@@ -173,8 +167,6 @@ def Terminate():
 
     """
     Pm_Terminate()
-    _pypm_initialized = 0
-
 
 def GetDefaultInputDeviceID():
     """Return the number of the default MIDI input device.
@@ -268,7 +260,7 @@ cdef class Output:
     cdef int debug
     cdef int _aborted
 
-    def __init__(self, output_device, latency=0, buffer_size=256):
+    def __init__(self, output_device, latency=0):
         """Instantiate MIDI output stream object."""
 
         cdef PmError err
@@ -286,13 +278,11 @@ cdef class Output:
             PmPtr = <PmTimeProcPtr>&Pt_Time
 
         if self.debug:
-            print "Opening Midi Output", output_device
+            print "Opening Midi Output"
 
-        err = Pm_OpenOutput(&(self.midi), output_device, NULL, buffer_size,
-                            PmPtr, NULL, latency)
-        if self.debug:
-            print "Pm_OpenOutput err", err
-
+        # Why is buffer size 0 here?
+        err = Pm_OpenOutput(&(self.midi), output_device, NULL, 0, PmPtr, NULL,
+                            latency)
         if err < 0:
             errmsg = Pm_GetErrorText(err)
             # Something's amiss here - if we try to throw an Exception
@@ -311,7 +301,7 @@ cdef class Output:
         if self.debug:
             print "Closing MIDI output stream and destroying instance."
 
-        if self.midi and _pypm_initialized:
+        if self.midi:
             err = Pm_Close(self.midi)
             if err < 0:
                 raise Exception(Pm_GetErrorText(err))
@@ -322,7 +312,6 @@ cdef class Output:
         Internal method, should be used only by other methods of this class.
 
         """
-
         if self.midi == NULL:
             raise Exception("midi Output not open.")
 
@@ -340,7 +329,7 @@ cdef class Output:
         """
         cdef PmError err
 
-        if not self.midi or not _pypm_initialized:
+        if not self.midi:
             return
 
         err = Pm_Close(self.midi)
@@ -503,12 +492,8 @@ cdef class Output:
         self._check_open()
 
         if type(msg) is list:
-            # Markus Pfaff contribution
-            arr = array.array('B', msg)
-            if sys.version_info[0] == 3:
-                msg = arr.tobytes()
-            else:
-                msg = arr.tostring()
+             # Markus Pfaff contribution
+            msg = array.array('B', msg).tostring()
         cmsg = msg
 
         cur_time = Pt_Time()
@@ -547,14 +532,12 @@ cdef class Input:
             raise Exception(Pm_GetErrorText(err))
 
         if self.debug:
-            print "MIDI input opened.", input_device
+            print "MIDI input opened."
 
     def __dealloc__(self):
         """Close midi device if still open when the instance is destroyed."""
 
         cdef PmError err
-        if not _pypm_initialized:
-            return
 
         if self.debug:
             print "Closing MIDI input stream and destroying instance"
@@ -582,8 +565,6 @@ cdef class Input:
 
         """
         cdef PmError err
-        if not _pypm_initialized:
-            return
 
         if not self.midi:
             return

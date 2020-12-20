@@ -144,7 +144,7 @@ that color for the colorkey. ::
       try:
           sound = pygame.mixer.Sound(fullname)
       except pygame.error as message:
-          print('Cannot load sound:', fullname)
+          print('Cannot load sound:', wav)
           raise SystemExit(message)
       return sound
 

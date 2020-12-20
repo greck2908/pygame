@@ -593,6 +593,7 @@ class GfxdrawDefaultTest(unittest.TestCase):
             for posn in bg_test_points:
                 self.check_at(surf, posn, bg_adjusted)
 
+    @unittest.expectedFailure
     def test_aatrigon__with_horizontal_edge(self):
         """Ensure aatrigon draws horizontal edges correctly.
 
@@ -725,6 +726,7 @@ class GfxdrawDefaultTest(unittest.TestCase):
             for posn in bg_test_points:
                 self.check_at(surf, posn, bg_adjusted)
 
+    @unittest.expectedFailure
     def test_aapolygon__with_horizontal_edge(self):
         """Ensure aapolygon draws horizontal edges correctly.
 

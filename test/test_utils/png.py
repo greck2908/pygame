@@ -163,7 +163,6 @@ __version__ = "$URL: http://pypng.googlecode.com/svn/trunk/code/png.py $ $Rev: 2
 
 from pygame.compat import geterror, imap_
 from array import array
-from pygame.tests.test_utils import tostring
 import itertools
 import math
 import operator
@@ -171,6 +170,7 @@ import struct
 import sys
 import zlib
 import warnings
+
 
 __all__ = ["Image", "Reader", "Writer", "write_chunks", "from_array"]
 
@@ -200,6 +200,13 @@ def isarray(x):
     """Same as ``isinstance(x, array)``.
     """
     return isinstance(x, array)
+
+
+def tostring(row):
+    """Convert row of bytes to string.  Expects `row` to be an
+    ``array``.
+    """
+    return row.tostring()
 
 
 # Conditionally convert to bytes.  Works on Python 2 and Python 3.
@@ -1338,7 +1345,7 @@ class _readable:
     def read(self, n):
         r = self.buf[self.offset : self.offset + n]
         if isarray(r):
-            r = tostring(r)
+            r = r.tostring()
         self.offset += n
         return r
 
@@ -1517,7 +1524,8 @@ class Reader:
 
         def up():
             """Undo up filter."""
-            for i in range(len(result)):  # pylint: disable=consider-using-enumerate
+
+            for i in range(len(result)):
                 x = scanline[i]
                 b = previous[i]
                 result[i] = (x + b) & 0xFF
@@ -1526,7 +1534,7 @@ class Reader:
             """Undo average filter."""
 
             ai = -fu
-            for i in range(len(result)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(result)):
                 x = scanline[i]
                 if ai < 0:
                     a = 0
@@ -1541,7 +1549,7 @@ class Reader:
 
             # Also used for ci.
             ai = -fu
-            for i in range(len(result)):  # pylint: disable=consider-using-enumerate
+            for i in range(len(result)):
                 x = scanline[i]
                 if ai < 0:
                     a = c = 0

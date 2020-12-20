@@ -27,13 +27,13 @@
  */
 #define _IMPORT_PYGAME_MODULE(module)                                        \
     {                                                                        \
-        PyObject *_mod_##module = PyImport_ImportModule(IMPPREFIX #module);  \
+        PyObject *_module = PyImport_ImportModule(IMPPREFIX #module);        \
                                                                              \
-        if (_mod_##module != NULL) {                                         \
+        if (_module != NULL) {                                               \
             PyObject *_c_api =                                               \
-                PyObject_GetAttrString(_mod_##module, PYGAMEAPI_LOCAL_ENTRY);\
+                PyObject_GetAttrString(_module, PYGAMEAPI_LOCAL_ENTRY);      \
                                                                              \
-            Py_DECREF(_mod_##module);                                        \
+            Py_DECREF(_module);                                              \
             if (_c_api != NULL && PyCapsule_CheckExact(_c_api)) {            \
                 void **localptr = (void **)PyCapsule_GetPointer(             \
                     _c_api, PG_CAPSULE_NAME(#module));                       \

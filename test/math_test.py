@@ -782,10 +782,10 @@ class Vector2TypeTest(unittest.TestCase):
         self.assertEqual(v1.elementwise() > s1, v1.x > s1 and v1.y > s1)
         self.assertEqual(v1.elementwise() < s1, v1.x < s1 and v1.y < s1)
         self.assertEqual(v1.elementwise() == s1, v1.x == s1 and v1.y == s1)
-        self.assertEqual(v1.elementwise() != s1, s1 not in [v1.x, v1.y])
+        self.assertEqual(v1.elementwise() != s1, v1.x != s1 and v1.y != s1)
         self.assertEqual(v1.elementwise() >= s1, v1.x >= s1 and v1.y >= s1)
         self.assertEqual(v1.elementwise() <= s1, v1.x <= s1 and v1.y <= s1)
-        self.assertEqual(v1.elementwise() != s1, s1 not in [v1.x, v1.y])
+        self.assertEqual(v1.elementwise() != s1, v1.x != s1 and v1.y != s1)
         # behaviour for "scalar op elementwise"
         self.assertEqual(s1 + v1.elementwise(), (s1 + v1.x, s1 + v1.y))
         self.assertEqual(s1 - v1.elementwise(), (s1 - v1.x, s1 - v1.y))
@@ -797,10 +797,10 @@ class Vector2TypeTest(unittest.TestCase):
         self.assertEqual(s1 < v1.elementwise(), s1 < v1.x and s1 < v1.y)
         self.assertEqual(s1 > v1.elementwise(), s1 > v1.x and s1 > v1.y)
         self.assertEqual(s1 == v1.elementwise(), s1 == v1.x and s1 == v1.y)
-        self.assertEqual(s1 != v1.elementwise(), s1 not in [v1.x, v1.y])
+        self.assertEqual(s1 != v1.elementwise(), s1 != v1.x and s1 != v1.y)
         self.assertEqual(s1 <= v1.elementwise(), s1 <= v1.x and s1 <= v1.y)
         self.assertEqual(s1 >= v1.elementwise(), s1 >= v1.x and s1 >= v1.y)
-        self.assertEqual(s1 != v1.elementwise(), s1 not in [v1.x, v1.y])
+        self.assertEqual(s1 != v1.elementwise(), s1 != v1.x and s1 != v1.y)
 
         # behaviour for "elementwise op vector"
         self.assertEqual(type(v1.elementwise() * v2), type(v1))
@@ -2110,35 +2110,6 @@ class Vector3TypeTest(unittest.TestCase):
         v = Vector(2.0, 2.0, 2.0)
         v *= 2
         self.assertEqual(v, (4.0, 4.0, 4.0))
-
-    def test_swizzle_constants(self):
-        """We can get constant values from a swizzle."""
-        v = Vector2(7, 6)
-        self.assertEqual(
-            v.xy1,
-            (7.0, 6.0, 1.0),
-        )
-
-    def test_swizzle_four_constants(self):
-        """We can get 4 constant values from a swizzle."""
-        v = Vector2(7, 6)
-        self.assertEqual(
-            v.xy01,
-            (7.0, 6.0, 0.0, 1.0),
-        )
-
-    def test_swizzle_oob(self):
-        """An out-of-bounds swizzle raises an AttributeError."""
-        v = Vector2(7, 6)
-        with self.assertRaises(AttributeError):
-            v.xyz
-
-    @unittest.skipIf(IS_PYPY, "known pypy failure")
-    def test_swizzle_set_oob(self):
-        """An out-of-bounds swizzle set raises an AttributeError."""
-        v = Vector2(7, 6)
-        with self.assertRaises(AttributeError):
-            v.xz = (1, 1)
 
 
 if __name__ == "__main__":

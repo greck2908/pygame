@@ -46,9 +46,6 @@ typedef struct {
 static const char pg_default_encoding[] = "unicode_escape";
 static const char pg_default_errors[] = "backslashreplace";
 
-#define PATHLIB "pathlib"
-#define PUREPATH "PurePath"
-
 #if IS_SDLv1
 static int
 _pg_rw_seek(SDL_RWops *, int, int);
@@ -163,60 +160,15 @@ fetch_object_methods(pgRWHelper *helper, PyObject *obj)
     return 0;
 }
 
-/* This function is meant to decode a pathlib object into its str/bytes representation.
- * It is based on PyOS_FSPath, and defines this function on python 3.4, 3.5 */
-static PyObject *
-_trydecode_pathlibobj(PyObject *obj)
-{
-#if PY_VERSION_HEX >= 0x03060000
-    PyObject *ret = PyOS_FSPath(obj);
-    if (!ret) {
-        /* A valid object was not passed. But we do not consider it an error */
-        PyErr_Clear();
-        Py_INCREF(obj);
-        return obj;
-    }
-    return ret;
-#elif PY_VERSION_HEX >= 0x03040000
-    /* Custom implementation for back-compat */
-    int ret;
-    PyObject *pathlib, *purepath;
-
-    pathlib = PyImport_ImportModule(PATHLIB);
-    if (!pathlib)
-        return NULL;
-
-    purepath = PyObject_GetAttrString(pathlib, PUREPATH);
-    if (!purepath) {
-        Py_DECREF(pathlib);
-        return NULL;
-    }
-
-    ret = PyObject_IsInstance(obj, purepath);
-
-    Py_DECREF(pathlib);
-    Py_DECREF(purepath);
-
-    if (ret == 1)
-        return PyObject_Str(obj);
-    else if (ret == 0) {
-        Py_INCREF(obj);
-        return obj;
-    }
-    else
-        return NULL;
-#else
-    /* Pathlib module does not exist, just incref and return */
-    Py_INCREF(obj);
-    return obj;
-#endif
-}
-
 static PyObject *
 pg_EncodeString(PyObject *obj, const char *encoding, const char *errors,
                 PyObject *eclass)
 {
-    PyObject *oencoded, *exc_type, *exc_value, *exc_trace, *str, *ret;
+    PyObject *oencoded;
+    PyObject *exc_type;
+    PyObject *exc_value;
+    PyObject *exc_trace;
+    PyObject *str;
 
     if (obj == NULL) {
         /* Assume an error was raise; forward it */
@@ -228,15 +180,8 @@ pg_EncodeString(PyObject *obj, const char *encoding, const char *errors,
     if (errors == NULL) {
         errors = pg_default_errors;
     }
-    
-    ret = _trydecode_pathlibobj(obj);
-    if (!ret)
-        return NULL;
-    
-    if (PyUnicode_Check(ret)) {
-        oencoded = PyUnicode_AsEncodedString(ret, encoding, errors);
-        Py_DECREF(ret);
-
+    if (PyUnicode_Check(obj)) {
+        oencoded = PyUnicode_AsEncodedString(obj, encoding, errors);
         if (oencoded != NULL) {
             return oencoded;
         }
@@ -270,14 +215,12 @@ pg_EncodeString(PyObject *obj, const char *encoding, const char *errors,
                          " unexpected encoding error");
         }
         PyErr_Clear();
-        Py_RETURN_NONE;
     }
-    
-    if (Bytes_Check(ret)) {
-        return ret;
+    else if (Bytes_Check(obj)) {
+        Py_INCREF(obj);
+        return obj;
     }
 
-    Py_DECREF(ret);
     Py_RETURN_NONE;
 }
 
@@ -403,11 +346,7 @@ _pg_rw_write(SDL_RWops *context, const void *ptr, size_t size, size_t num)
     if (!helper->write)
         return -1;
 
-#if PY3
-    result = PyObject_CallFunction(helper->write, "y#", ptr, size * num);
-#else  /* PY2 */
     result = PyObject_CallFunction(helper->write, "s#", ptr, size * num);
-#endif  /* PY2 */
     if (!result)
         return -1;
 
@@ -423,11 +362,7 @@ _pg_rw_write(SDL_RWops *context, const void *ptr, size_t size, size_t num)
         return -1;
     state = PyGILState_Ensure();
 
-#if PY3
-    result = PyObject_CallFunction(helper->write, "y#", ptr, size * num);
-#else  /* PY2 */
     result = PyObject_CallFunction(helper->write, "s#", ptr, size * num);
-#endif  /* PY2 */
     if (!result) {
         PyErr_Print();
         retval = -1;

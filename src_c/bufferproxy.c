@@ -522,6 +522,8 @@ proxy_releasebuffer(pgBufproxyObject *self, Py_buffer *view_p)
     PyMem_Free(view_p->internal);
 }
 
+#if PG_ENABLE_NEWBUF || PG_ENABLE_OLDBUF
+
 #if PG_ENABLE_OLDBUF
 static int
 _is_byte_view(Py_buffer *view_p)
@@ -617,7 +619,7 @@ proxy_getsegcount(pgBufproxyObject *self, Py_ssize_t *lenp)
     return self->segcount;
 }
 
-#endif
+#endif /* #if PG_ENABLE_OLDBUF */
 
 #define PROXY_BUFFERPROCS (&proxy_bufferprocs)
 
@@ -635,16 +637,23 @@ static PyBufferProcs proxy_bufferprocs = {
 #if HAVE_OLD_BUFPROTO
     ,
 #endif
+
+#if PG_ENABLE_NEWBUF
     (getbufferproc)proxy_getbuffer,
     (releasebufferproc)proxy_releasebuffer
+#else
+    0,
+    0
+#endif
 };
 
+#endif /* #if PG_ENABLE_NEWBUF || PG_ENABLE_OLDBUF */
 
 #if !defined(PROXY_BUFFERPROCS)
 #define PROXY_BUFFERPROCS 0
 #endif
 
-#if PY2
+#if PY2 && PG_ENABLE_NEWBUF
 #define PROXY_TPFLAGS                                                \
     (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | \
      Py_TPFLAGS_HAVE_NEWBUFFER)
@@ -654,8 +663,7 @@ static PyBufferProcs proxy_bufferprocs = {
 #endif
 
 static PyTypeObject pgBufproxy_Type = {
-    PyVarObject_HEAD_INIT(NULL,0)
-    PROXY_TYPE_FULLNAME,                    /* tp_name */
+    TYPE_HEAD(NULL, 0) PROXY_TYPE_FULLNAME, /* tp_name */
     sizeof(pgBufproxyObject),               /* tp_basicsize */
     0,                                      /* tp_itemsize */
     (destructor)proxy_dealloc,              /* tp_dealloc */

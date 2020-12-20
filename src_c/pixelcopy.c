@@ -134,21 +134,12 @@ _view_kind(PyObject *obj, void *view_kind_vptr)
     _pc_view_kind_t *view_kind_ptr = (_pc_view_kind_t *)view_kind_vptr;
 
     if (PyUnicode_Check(obj)) {
-#if PY2
         if (PyUnicode_GET_SIZE(obj) != 1) {
             PyErr_SetString(PyExc_TypeError,
                             "expected a length 1 string for argument 3");
             return 0;
         }
         ch = *PyUnicode_AS_UNICODE(obj);
-#else
-        if (PyUnicode_GET_LENGTH(obj) != 1) {
-            PyErr_SetString(PyExc_TypeError,
-                            "expected a length 1 string for argument 3");
-            return 0;
-        }
-        ch = PyUnicode_READ_CHAR(obj, 0);
-#endif
     }
     else if (Bytes_Check(obj)) {
         if (Bytes_GET_SIZE(obj) != 1) {
@@ -489,8 +480,7 @@ _copy_unmapped(Py_buffer *view_p, SDL_Surface *surf)
 static PyObject *
 array_to_surface(PyObject *self, PyObject *arg)
 {
-    pgSurfaceObject *surfobj;
-    PyObject *arrayobj;
+    PyObject *surfobj, *arrayobj;
     pg_buffer pg_view;
     Py_buffer *view_p = (Py_buffer *)&pg_view;
     char *array_data;
@@ -784,7 +774,7 @@ static PyObject *
 surface_to_array(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *arrayobj;
-    pgSurfaceObject *surfobj;
+    PyObject *surfobj;
     pg_buffer pg_view;
     Py_buffer *view_p = (Py_buffer *)&pg_view;
     _pc_view_kind_t view_kind = VIEWKIND_RGB;
@@ -864,7 +854,7 @@ map_array(PyObject *self, PyObject *args)
 #define PIXELCOPY_MAX_DIM 10
     PyObject *src_array;
     PyObject *tar_array;
-    pgSurfaceObject *format_surf;
+    PyObject *format_surf;
     SDL_PixelFormat *format;
     pg_buffer src_pg_view;
     Py_buffer *src_view_p = 0;
@@ -1151,7 +1141,7 @@ make_surface(PyObject *self, PyObject *arg)
 {
     pg_buffer pg_view;
     Py_buffer *view_p = (Py_buffer *)&pg_view;
-    pgSurfaceObject *surfobj;
+    PyObject *surfobj;
     PyObject *args;
     PyObject *result;
     SDL_Surface *surf;
@@ -1233,7 +1223,7 @@ make_surface(PyObject *self, PyObject *arg)
         return 0;
     }
     Py_DECREF(result);
-    return (PyObject *)surfobj;
+    return surfobj;
 }
 
 static PyMethodDef _pixelcopy_methods[] = {

@@ -1,13 +1,11 @@
-from typing import Any, overload, Optional, TypeVar, Text
-
-AnyStr = TypeVar("AnyStr", Text, bytes)
+from typing import Any, overload
 
 class BufferProxy(object):
     parent: Any
     length: int
-    raw: AnyStr
+    raw: bytes
     @overload
     def __init__(self) -> None: ...
     @overload
     def __init__(self, parent: Any) -> None: ...
-    def write(self, buffer: bytes, offset: Optional[int] = 0) -> None: ...
+    def write(self, buffer: bytes, offset: int = ...) -> None: ...

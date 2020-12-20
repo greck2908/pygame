@@ -93,8 +93,9 @@
       | :sg:`blit(source, dest, area=None, special_flags=0) -> Rect`
 
       Draws a source Surface onto this Surface. The draw can be positioned with
-      the dest argument. The dest argument can either be a pair of coordinates representing the position of
-      the upper left corner of the blit or a Rect, where the upper left corner of the rectangle will be used as the
+      the dest argument. Dest can either be pair of coordinates representing
+      the upper left corner of the source. A Rect can also be passed as the
+      destination and the topleft corner of the rectangle will be used as the
       position for the blit. The size of the destination rectangle does not
       effect the blit.
 
@@ -110,15 +111,6 @@
          ``BLEND_RGBA_MULT``, ``BLEND_RGBA_MIN``, ``BLEND_RGBA_MAX``
          ``BLEND_RGB_ADD``, ``BLEND_RGB_SUB``, ``BLEND_RGB_MULT``,
          ``BLEND_RGB_MIN``, ``BLEND_RGB_MAX``.
-
-      .. versionadded:: 1.9.2
-         Optional ``special_flags``: ``BLEND_PREMULTIPLIED``
-
-      .. versionadded:: 2.0.0
-         Optional ``special_flags``:  ``BLEND_ALPHA_SDL2`` - Uses the SDL2 blitter for alpha blending,
-         this gives different results than the default blitter, which is modelled after SDL1, due to
-         different approximations used for the alpha blending formula. The SDL2 blitter also supports
-         RLE on alpha blended surfaces which the pygame one does not.
 
       The return rectangle is the area of the affected pixels, excluding any
       pixels outside the destination Surface, or outside the clipping area.
@@ -776,9 +768,6 @@
 
       This is not needed for normal pygame usage.
 
-      .. note:: In SDL2, the masks are read-only and accordingly this method will raise
-                an AttributeError if called.
-
       .. versionadded:: 1.8.1
 
       .. ## Surface.set_masks ##
@@ -801,9 +790,6 @@
       | :sg:`set_shifts((r,g,b,a)) -> None`
 
       This is not needed for normal pygame usage.
-
-      .. note:: In SDL2, the shifts are read-only and accordingly this method will raise
-                an AttributeError if called.
 
       .. versionadded:: 1.8.1
 
