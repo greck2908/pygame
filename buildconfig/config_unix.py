@@ -50,7 +50,7 @@ class DependencyProg:
             if self.name == 'SDL':
                 inc = '-I' + '/usr/X11R6/include'
                 self.cflags = inc + ' ' + self.cflags
-        except:
+        except (ValueError, TypeError):
             print ('WARNING: "%s" failed!' % command)
             self.found = 0
             self.ver = '0'
@@ -136,13 +136,14 @@ def main(sdl2=False):
     #these get prefixes with '/usr' and '/usr/local' or the $LOCALBASE
     if sdl2:
         origincdirs = ['/include', '/include/SDL2']
-        origlibdirs = ['/lib','/lib64','/X11R6/lib',
+        origlibdirs = ['/lib', '/lib64', '/X11R6/lib',
                        '/lib/i386-linux-gnu', '/lib/x86_64-linux-gnu',
-                       '/lib/arm-linux-gnueabihf/']
+                       '/lib/arm-linux-gnueabihf/', '/lib/aarch64-linux-gnu/']
 
     else:
         origincdirs = ['/include', '/include/SDL', '/include/SDL']
-        origlibdirs = ['/lib','/lib64','/X11R6/lib', '/lib/arm-linux-gnueabihf/']
+        origlibdirs = ['/lib', '/lib64', '/X11R6/lib', '/lib/arm-linux-gnueabihf/',
+                       '/lib/aarch64-linux-gnu/']
     if 'ORIGLIBDIRS' in os.environ and os.environ['ORIGLIBDIRS'] != "":
         origlibdirs = os.environ['ORIGLIBDIRS'].split(":")
 
@@ -226,8 +227,8 @@ def main(sdl2=False):
     incdirs = []
     libdirs = []
     for extrabase in extrabases:
-        incdirs = [extrabase + d for d in origincdirs]
-        libdirs = [extrabase + d for d in origlibdirs]
+        incdirs += [extrabase + d for d in origincdirs]
+        libdirs += [extrabase + d for d in origlibdirs]
     incdirs += ["/usr"+d for d in origincdirs]
     libdirs += ["/usr"+d for d in origlibdirs]
     incdirs += ["/usr/local"+d for d in origincdirs]

@@ -761,7 +761,7 @@ static PyObject *
 mask_from_surface(PyObject *self, PyObject *args)
 {
     SDL_Surface *surf = NULL;
-    PyObject *surfobj = NULL;
+    pgSurfaceObject *surfobj = NULL;
     pgMaskObject *maskobj = NULL;
     Uint32 colorkey;
     int threshold = 127; /* default value */
@@ -991,7 +991,8 @@ bitmask_threshold(bitmask_t *m, SDL_Surface *surf, SDL_Surface *surf2,
 static PyObject *
 mask_from_threshold(PyObject *self, PyObject *args)
 {
-    PyObject *surfobj, *surfobj2 = NULL;
+    pgSurfaceObject *surfobj = NULL;
+    pgSurfaceObject *surfobj2 = NULL;
     pgMaskObject *maskobj = NULL;
     SDL_Surface *surf = NULL, *surf2 = NULL;
     PyObject *rgba_obj_color, *rgba_obj_threshold = NULL;
@@ -1794,20 +1795,21 @@ mask_connected_component(PyObject *self, PyObject *args)
  *
  * Returns:
  *     int: 1, means the color data extraction was successful and the color
- *              parameter contains a valid color value
+ *             parameter contains a valid color value
  *          0, means the color data extraction has failed and an exception has
- *              been set
+ *             been set
  */
 static int
 extract_color(SDL_Surface *surf, PyObject *color_obj, Uint8 rgba_color[],
               Uint32 *color)
 {
-    if ((NULL == color_obj) || (pg_RGBAFromColorObj(color_obj, rgba_color))) {
+    if (NULL == color_obj) {
         *color = SDL_MapRGBA(surf->format, rgba_color[0], rgba_color[1],
                              rgba_color[2], rgba_color[3]);
         return 1;
     }
-    else if (PyInt_Check(color_obj)) {
+
+    if (PyInt_Check(color_obj)) {
         long intval = PyInt_AsLong(color_obj);
 
         if ((-1 == intval && PyErr_Occurred()) || intval > (long)0xFFFFFFFF) {
@@ -1818,7 +1820,8 @@ extract_color(SDL_Surface *surf, PyObject *color_obj, Uint8 rgba_color[],
         *color = (Uint32)intval;
         return 1;
     }
-    else if (PyLong_Check(color_obj)) {
+
+    if (PyLong_Check(color_obj)) {
         unsigned long longval = PyLong_AsUnsignedLong(color_obj);
 
         if (PyErr_Occurred() || longval > 0xFFFFFFFF) {
@@ -1830,8 +1833,13 @@ extract_color(SDL_Surface *surf, PyObject *color_obj, Uint8 rgba_color[],
         return 1;
     }
 
-    PyErr_SetString(PyExc_TypeError, "invalid color argument");
-    return 0;
+    if (pg_RGBAFromFuzzyColorObj(color_obj, rgba_color)) {
+        *color = SDL_MapRGBA(surf->format, rgba_color[0], rgba_color[1],
+                             rgba_color[2], rgba_color[3]);
+        return 1;
+    }
+
+    return 0; /* Exception already set. */
 }
 
 /* Draws a mask on a surface.
@@ -2020,6 +2028,8 @@ check_surface_pixel_format(SDL_Surface *surf, SDL_Surface *check_surf)
         (surf->format->BitsPerPixel != check_surf->format->BitsPerPixel)
 #if IS_SDLv2
         || (surf->format->format != check_surf->format->format)
+#else
+        || ((surf->flags & SDL_SRCALPHA) != (check_surf->flags & SDL_SRCALPHA))
 #endif
     ) {
         return 0;
@@ -2176,21 +2186,22 @@ mask_to_surface(PyObject *self, PyObject *args, PyObject *kwargs)
         }
     }
 
-    if (!pgSurface_Lock(surfobj)) {
+    if (!pgSurface_Lock((pgSurfaceObject *)surfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot lock surface");
         goto to_surface_error;
     }
 
     /* Only lock the setsurface if it is being used.
      * i.e. setsurf is non-NULL */
-    if (NULL != setsurf && !pgSurface_Lock(setsurfobj)) {
+    if (NULL != setsurf && !pgSurface_Lock((pgSurfaceObject *)setsurfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot lock setsurface");
         goto to_surface_error;
     }
 
     /* Only lock the unsetsurface if it is being used.
      * i.e.. unsetsurf is non-NULL. */
-    if (NULL != unsetsurf && !pgSurface_Lock(unsetsurfobj)) {
+    if (NULL != unsetsurf &&
+        !pgSurface_Lock((pgSurfaceObject *)unsetsurfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot lock unsetsurface");
         goto to_surface_error;
     }
@@ -2203,17 +2214,19 @@ mask_to_surface(PyObject *self, PyObject *args, PyObject *kwargs)
 
     Py_END_ALLOW_THREADS; /* Obtain the GIL. */
 
-    if (NULL != unsetsurf && !pgSurface_Unlock(unsetsurfobj)) {
+    if (NULL != unsetsurf &&
+        !pgSurface_Unlock((pgSurfaceObject *)unsetsurfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot unlock unsetsurface");
         goto to_surface_error;
     }
 
-    if (NULL != setsurf && !pgSurface_Unlock(setsurfobj)) {
+    if (NULL != setsurf &&
+        !pgSurface_Unlock((pgSurfaceObject *)setsurfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot unlock setsurface");
         goto to_surface_error;
     }
 
-    if (!pgSurface_Unlock(surfobj)) {
+    if (!pgSurface_Unlock((pgSurfaceObject *)surfobj)) {
         PyErr_SetString(PyExc_RuntimeError, "cannot unlock surface");
         goto to_surface_error;
     }
@@ -2460,7 +2473,8 @@ static PyBufferProcs pgMask_BufferProcs = {
 #endif /* PY3 */
 
 static PyTypeObject pgMask_Type = {
-    TYPE_HEAD(NULL, 0) "pygame.mask.Mask", /* tp_name */
+    PyVarObject_HEAD_INIT(NULL,0)
+    "pygame.mask.Mask",   /* tp_name */
     sizeof(pgMaskObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
     mask_dealloc,         /* tp_dealloc */

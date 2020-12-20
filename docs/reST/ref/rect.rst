@@ -24,7 +24,7 @@
    The Rect functions that change the position or size of a Rect return a new
    copy of the Rect with the affected changes. The original Rect is not
    modified. Some methods have an alternate "in-place" version that returns
-   None but effects the original Rect. These "in-place" methods are denoted
+   None but affects the original Rect. These "in-place" methods are denoted
    with the "ip" suffix.
 
    The Rect object has several virtual attributes which can be used to move and
@@ -51,9 +51,10 @@
    all other assignments move the rectangle without resizing it. Notice that
    some attributes are integers and others are pairs of integers.
 
-   If a Rect has a nonzero width or height, it will return True for a nonzero
-   test. Some methods return a Rect with 0 size to represent an invalid
-   rectangle.
+   If a Rect has a nonzero width or height, it will return ``True`` for a
+   nonzero test. Some methods return a Rect with 0 size to represent an invalid
+   rectangle. A Rect with a 0 size will not collide when using collision
+   detection methods (e.g. :meth:`collidepoint`, :meth:`colliderect`, etc.).
 
    The coordinates for Rect objects are all integers. The size values can be
    programmed to have negative values, but these are considered illegal Rects
@@ -124,6 +125,20 @@
       Same as the ``Rect.inflate()`` method, but operates in place.
 
       .. ## Rect.inflate_ip ##
+
+   .. method:: update
+
+      | :sl:`sets the position and size of the rectangle`
+      | :sg:`update(left, top, width, height) -> None`
+      | :sg:`update((left, top), (width, height)) -> None`
+      | :sg:`update(object) -> None`
+
+      Sets the position and size of the rectangle, in place. See
+      parameters for :meth:`pygame.Rect` for the parameters of this function.
+
+      .. versionadded:: 2.0.1
+
+      .. ## Rect.update ##
 
    .. method:: clamp
 

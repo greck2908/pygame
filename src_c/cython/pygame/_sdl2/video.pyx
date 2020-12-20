@@ -22,12 +22,17 @@ cdef extern from "SDL.h" nogil:
     int SDL_SetWindowOpacity(SDL_Window *window, float opacity)
     int SDL_SetWindowModalFor(SDL_Window *modal_window, SDL_Window *parent_window)
     int SDL_SetWindowInputFocus(SDL_Window *window)
+    int SDL_SetRelativeMouseMode(SDL_bool enabled)
+    SDL_bool SDL_GetRelativeMouseMode()
     SDL_Renderer* SDL_GetRenderer(SDL_Window* window)
     SDL_Window* SDL_GetWindowFromID(Uint32 id)
     SDL_Surface * SDL_CreateRGBSurfaceWithFormat(Uint32 flags, int width, int height, int depth, Uint32 format)
 
 
 cdef extern from "pygame.h" nogil:
+    ctypedef struct pgSurfaceObject:
+        pass
+
     int pgSurface_Check(object surf)
     SDL_Surface* pgSurface_AsSurface(object surf)
     void import_pygame_surface()
@@ -46,7 +51,7 @@ cdef extern from "pygame.h" nogil:
     object pgColor_New(Uint8 rgba[])
     object pgColor_NewLength(Uint8 rgba[], Uint8 length)
     void import_pygame_color()
-    object pgSurface_New2(SDL_Surface *info, int owner)
+    pgSurfaceObject *pgSurface_New2(SDL_Surface *info, int owner)
 
 cdef extern from "pgcompat.h" nogil:
     pass
@@ -297,6 +302,25 @@ cdef class Window:
     def grab(self, bint grabbed):
         # https://wiki.libsdl.org/SDL_SetWindowGrab
         SDL_SetWindowGrab(self._win, 1 if grabbed else 0)
+
+    @property
+    def relative_mouse(self):
+        """ Window's relative mouse motion state (``True`` or ``False``).
+
+        Set it to ``True`` to enable, ``False`` to disable.
+        If mouse.set_visible(True) is set the input will be grabbed,
+        and the mouse will enter endless relative motion mode.
+
+        :rtype: bool
+        """
+        return SDL_GetRelativeMouseMode()
+
+
+    @relative_mouse.setter
+    def relative_mouse(self, bint enable):
+        # https://wiki.libsdl.org/SDL_SetRelativeMouseMode
+        #SDL_SetWindowGrab(self._win, 1 if enable else 0)
+        SDL_SetRelativeMouseMode(1 if enable else 0)
 
     def set_windowed(self):
         """ Enable windowed mode
@@ -1174,7 +1198,7 @@ cdef class Renderer:
             if surf == NULL:
                 raise MemoryError("not enough memory for the surface")
 
-            surface = pgSurface_New2(surf, 1)
+            surface = <object>pgSurface_New2(surf, 1)
         elif pgSurface_Check(surface):
             surf = pgSurface_AsSurface(surface)
             if surf.w < rarea.w or surf.h < rarea.h:

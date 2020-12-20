@@ -97,8 +97,12 @@ loaded instead.
    Returns the full path to a font file on the system. If bold or italic are
    set to true, this will attempt to find the correct family of font.
 
-   The font name can actually be a comma separated list of font names to try.
+   The font name can also be an iterable of font names, a string of
+   comma-separated font names, or a bytes of comma-separated font names, in
+   which case the set of names will be searched in order.
    If none of the given names are found, None is returned.
+
+   .. versionadded:: 2.0.1 Accept an iterable of font names.
 
    Example:
 
@@ -116,9 +120,16 @@ loaded instead.
    | :sg:`SysFont(name, size, bold=False, italic=False) -> Font`
 
    Return a new Font object that is loaded from the system fonts. The font will
-   match the requested bold and italic flags. If a suitable system font is not
-   found this will fall back on loading the default pygame font. The font name
-   can be a comma separated list of font names to look for.
+   match the requested bold and italic flags. Pygame uses a small set of common
+   font aliases. If the specific font you ask for is not available, a reasonable
+   alternative may be used. If a suitable system font is not found this will
+   fall back on loading the default pygame font.
+
+   The font name can also be an iterable of font names, a string of
+   comma-separated font names, or a bytes of comma-separated font names, in
+   which case the set of names will be searched in order.
+
+   .. versionadded:: 2.0.1 Accept an iterable of font names.
 
    .. ## pygame.font.SysFont ##
 
@@ -126,6 +137,7 @@ loaded instead.
 
    | :sl:`create a new Font object from a file`
    | :sg:`Font(filename, size) -> Font`
+   | :sg:`Font(pathlib.Path, size) -> Font`
    | :sg:`Font(object, size) -> Font`
 
    Load a new font from a given filename or a python file object. The size is
@@ -138,6 +150,56 @@ loaded instead.
    render can emulate bold or italic features, but it is better to load from a
    font with actual italic or bold glyphs. The rendered text can be regular
    strings or unicode.
+
+   .. attribute:: bold
+
+      | :sl:`Gets or sets whether the font should be rendered in (faked) bold.`
+      | :sg:`bold -> bool`
+
+      Whether the font should be rendered in bold.
+
+      When set to True, this enables the bold rendering of text. This
+      is a fake stretching of the font that doesn't look good on many
+      font types. If possible load the font from a real bold font
+      file. While bold, the font will have a different width than when
+      normal. This can be mixed with the italic and underline modes.
+
+      .. versionadded:: 2.0.0
+
+      .. ## Font.bold ##
+
+   .. attribute:: italic
+
+      | :sl:`Gets or sets whether the font should be rendered in (faked) italics.`
+      | :sg:`italic -> bool`
+
+      Whether the font should be rendered in italic.
+
+      When set to True, this enables fake rendering of italic
+      text. This is a fake skewing of the font that doesn't look good
+      on many font types. If possible load the font from a real italic
+      font file. While italic the font will have a different width
+      than when normal. This can be mixed with the bold and underline
+      modes.
+
+      .. versionadded:: 2.0.0
+
+      .. ## Font.italic ##
+
+   .. attribute:: underline
+
+      | :sl:`Gets or sets whether the font should be rendered with an underline.`
+      | :sg:`underline -> bool`
+
+      Whether the font should be rendered in underline.
+
+      When set to True, all rendered fonts will include an
+      underline. The underline is always one pixel thick, regardless
+      of font size. This can be mixed with the bold and italic modes.
+
+      .. versionadded:: 2.0.0
+
+      .. ## Font.underline ##
 
    .. method:: render
 
@@ -210,6 +272,8 @@ loaded instead.
       is always one pixel thick, regardless of font size. This can be mixed
       with the bold and italic modes.
 
+      .. note:: This is the same as the :attr:`underline` attribute.
+
       .. ## Font.set_underline ##
 
    .. method:: get_underline
@@ -218,6 +282,8 @@ loaded instead.
       | :sg:`get_underline() -> bool`
 
       Return True when the font underline is enabled.
+
+       .. note:: This is the same as the :attr:`underline` attribute.
 
       .. ## Font.get_underline ##
 
@@ -231,6 +297,8 @@ loaded instead.
       a real bold font file. While bold, the font will have a different width
       than when normal. This can be mixed with the italic and underline modes.
 
+      .. note:: This is the same as the :attr:`bold` attribute.
+
       .. ## Font.set_bold ##
 
    .. method:: get_bold
@@ -239,6 +307,8 @@ loaded instead.
       | :sg:`get_bold() -> bool`
 
       Return True when the font bold rendering mode is enabled.
+
+      .. note:: This is the same as the :attr:`bold` attribute.
 
       .. ## Font.get_bold ##
 
@@ -252,6 +322,8 @@ loaded instead.
       a real italic font file. While italic the font will have a different
       width than when normal. This can be mixed with the bold and underline
       modes.
+
+      .. note:: This is the same as the :attr:`italic` attribute.
 
       .. ## Font.set_italic ##
 
@@ -275,6 +347,8 @@ loaded instead.
       | :sg:`get_italic() -> bool`
 
       Return True when the font italic rendering mode is enabled.
+
+      .. note:: This is the same as the :attr:`italic` attribute.
 
       .. ## Font.get_italic ##
 

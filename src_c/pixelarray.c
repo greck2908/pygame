@@ -44,7 +44,7 @@ struct _pixelarray_t;
 typedef struct _pixelarray_t {
     PyObject_HEAD PyObject *dict; /* dict for subclassing */
     PyObject *weakrefs;           /* Weakrefs for subclassing */
-    PyObject *surface;            /* Surface associated with the array */
+    pgSurfaceObject *surface;     /* Surface associated with the array */
     Py_ssize_t shape[2];          /* (row,col) shape of array in pixels */
     Py_ssize_t strides[2];        /* (row,col) offsets in bytes */
     Uint8 *pixels;                /* Start of array data */
@@ -56,7 +56,7 @@ static int
 array_is_contiguous(pgPixelArrayObject *, char);
 
 static pgPixelArrayObject *
-_pxarray_new_internal(PyTypeObject *, PyObject *, pgPixelArrayObject *,
+_pxarray_new_internal(PyTypeObject *, pgSurfaceObject *, pgPixelArrayObject *,
                       Uint8 *, Py_ssize_t, Py_ssize_t, Py_ssize_t, Py_ssize_t);
 
 static PyObject *
@@ -68,7 +68,7 @@ _pxarray_traverse(pgPixelArrayObject *, visitproc, void *);
 
 static PyObject *
 _pxarray_get_dict(pgPixelArrayObject *, void *);
-static PyObject *
+static pgSurfaceObject *
 _pxarray_get_surface(pgPixelArrayObject *, void *);
 static PyObject *
 _pxarray_get_itemsize(pgPixelArrayObject *, void *);
@@ -167,7 +167,8 @@ _cleanup_array(pgPixelArrayObject *array)
         Py_DECREF(array->parent);
     }
     else {
-        pgSurface_UnlockBy(array->surface, (PyObject *)array);
+        pgSurface_UnlockBy(array->surface,
+                           (PyObject *)array);
     }
     Py_DECREF(array->surface);
     Py_XDECREF(array->dict);
@@ -265,8 +266,6 @@ static PyMappingMethods _pxarray_mapping = {
     (objobjargproc)_pxarray_ass_subscript, /*mp_ass_subscript*/
 };
 
-#if PG_ENABLE_NEWBUF
-
 static PyBufferProcs _pxarray_bufferprocs = {
 #if HAVE_OLD_BUFPROTO
     0,
@@ -279,11 +278,7 @@ static PyBufferProcs _pxarray_bufferprocs = {
 
 #define PXARRAY_BUFFERPROCS &_pxarray_bufferprocs
 
-#else
-#define PXARRAY_BUFFERPROCS 0
-#endif /* #if PG_ENABLE_NEWBUF */
-
-#if PY2 && PG_ENABLE_NEWBUF
+#if PY2
 #define PXARRAY_TPFLAGS                                              \
     (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | \
      Py_TPFLAGS_HAVE_NEWBUFFER)
@@ -293,7 +288,8 @@ static PyBufferProcs _pxarray_bufferprocs = {
 #endif
 
 static PyTypeObject pgPixelArray_Type = {
-    TYPE_HEAD(NULL, 0) "pygame.PixelArray", /* tp_name */
+    PyVarObject_HEAD_INIT(NULL,0)
+    "pygame.PixelArray",                    /* tp_name */
     sizeof(pgPixelArrayObject),             /* tp_basicsize */
     0,                                      /* tp_itemsize */
     (destructor)_pxarray_dealloc,           /* tp_dealloc */
@@ -343,7 +339,7 @@ static PyTypeObject pgPixelArray_Type = {
 };
 
 static pgPixelArrayObject *
-_pxarray_new_internal(PyTypeObject *type, PyObject *surface,
+_pxarray_new_internal(PyTypeObject *type, pgSurfaceObject *surface,
                       pgPixelArrayObject *parent, Uint8 *pixels,
                       Py_ssize_t dim0, Py_ssize_t dim1, Py_ssize_t stride0,
                       Py_ssize_t stride1)
@@ -396,7 +392,7 @@ _pxarray_new_internal(PyTypeObject *type, PyObject *surface,
 static PyObject *
 _pxarray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyObject *surfobj;
+    pgSurfaceObject *surfobj;
     SDL_Surface *surf;
     Py_ssize_t dim0;
     Py_ssize_t dim1;
@@ -478,7 +474,7 @@ _pxarray_get_dict(pgPixelArrayObject *self, void *closure)
 /**
  * Getter for PixelArray.surface
  */
-static PyObject *
+static pgSurfaceObject *
 _pxarray_get_surface(pgPixelArrayObject *self, void *closure)
 {
     Py_INCREF(self->surface);
@@ -1727,7 +1723,7 @@ _pxarray_subscript(pgPixelArrayObject *array, PyObject *op)
         return _pxarray_subscript_internal(array, start, stop, step, 0, dim1,
                                            1);
     }
-    else if (PyIndex_Check(op) || PyInt_Check(op) || PyLong_Check(op)) {
+    else if (PyIndex_Check(op) || INT_CHECK(op)) {
         Py_ssize_t i;
         PyObject *val = PyNumber_Index(op);
         if (!val) {
@@ -1889,7 +1885,7 @@ _pxarray_ass_subscript(pgPixelArrayObject *array, PyObject *op,
         Py_DECREF(tmparray);
         return retval;
     }
-    else if (PyIndex_Check(op) || PyInt_Check(op) || PyLong_Check(op)) {
+    else if (PyIndex_Check(op) || INT_CHECK(op)) {
         Py_ssize_t i;
         PyObject *val = PyNumber_Index(op);
         if (!val) {
@@ -1936,7 +1932,7 @@ pgPixelArray_New(PyObject *surfobj)
     }
 
     return (PyObject *)_pxarray_new_internal(
-        &pgPixelArray_Type, surfobj, 0, pixels, dim0, dim1, stride0, stride1);
+        &pgPixelArray_Type, (pgSurfaceObject *)surfobj, 0, pixels, dim0, dim1, stride0, stride1);
 }
 
 MODINIT_DEFINE(pixelarray)

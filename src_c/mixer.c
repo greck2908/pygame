@@ -341,7 +341,7 @@ pgMixer_AutoQuit(void)
 }
 
 static PyObject*
-import_music()
+import_music(void)
 {
     PyObject *music = PyImport_ImportModule(IMPPREFIX "mixer_music");
     if (music == NULL) {
@@ -357,6 +357,7 @@ _init(int freq, int size, int channels, int chunk, char *devicename, int allowed
     Uint16 fmt = 0;
     int i;
     PyObject *music;
+    char *drivername;
 
     if (!freq) {
         freq = request_frequency;
@@ -443,15 +444,32 @@ _init(int freq, int size, int channels, int chunk, char *devicename, int allowed
 
         if (!channeldata) /*should always be null*/
         {
-            numchanneldata = MIX_CHANNELS;
             channeldata = (struct ChannelData *)malloc(
-                sizeof(struct ChannelData) * numchanneldata);
+                sizeof(struct ChannelData) * MIX_CHANNELS);
+            if (!channeldata) {
+                return PyErr_NoMemory();
+            }
+            numchanneldata = MIX_CHANNELS;
             for (i = 0; i < numchanneldata; ++i) {
                 channeldata[i].sound = NULL;
                 channeldata[i].queue = NULL;
                 channeldata[i].endevent = 0;
             }
         }
+
+#if IS_SDLv2
+        /* Compatibility:
+            pulse and dsound audio drivers were renamed in SDL2,
+            and we don't want it to fail.
+        */
+        drivername = SDL_getenv("SDL_AUDIODRIVER");
+        if (drivername && SDL_strncasecmp("pulse", drivername, SDL_strlen(drivername)) == 0) {
+            SDL_setenv("SDL_AUDIODRIVER", "pulseaudio", 1);
+        }
+        else if (drivername && SDL_strncasecmp("dsound", drivername, SDL_strlen(drivername)) == 0) {
+            SDL_setenv("SDL_AUDIODRIVER", "directsound", 1);
+        }
+#endif
 
         if (SDL_InitSubSystem(SDL_INIT_AUDIO) == -1)
             return PyInt_FromLong(0);
@@ -947,16 +965,12 @@ snd_releasebuffer(PyObject *obj, Py_buffer *view)
     }
 }
 
-#if PG_ENABLE_NEWBUF
 
 static PyBufferProcs sound_as_buffer[] = {{
 #if HAVE_OLD_BUFPROTO
     0, 0, 0, 0,
 #endif
     snd_getbuffer, snd_releasebuffer}};
-#else
-#define sound_as_buffer 0
-#endif /* #if PG_ENABLE_NEWBUF */
 
 /*sound object internals*/
 static void
@@ -976,7 +990,9 @@ sound_dealloc(pgSoundObject *self)
 }
 
 static PyTypeObject pgSound_Type = {
-    TYPE_HEAD(NULL, 0) "Sound", sizeof(pgSoundObject), 0,
+    PyVarObject_HEAD_INIT(NULL,0)
+    "Sound", 
+    sizeof(pgSoundObject), 0,
     (destructor)sound_dealloc, 0, 0, 0, /* setattr */
     0,                                  /* compare */
     0,                                  /* repr */
@@ -1291,7 +1307,8 @@ channel_dealloc(PyObject *self)
 }
 
 static PyTypeObject pgChannel_Type = {
-    TYPE_HEAD(NULL, 0) "Channel", /* name */
+    PyVarObject_HEAD_INIT(NULL,0)
+    "Channel",                    /* name */
     sizeof(pgChannelObject),      /* basic size */
     0,                            /* itemsize */
     channel_dealloc,              /* dealloc */
@@ -1348,8 +1365,14 @@ set_num_channels(PyObject *self, PyObject *args)
 
     MIXER_INIT_CHECK();
     if (numchans > numchanneldata) {
+        struct ChannelData *cd_org = channeldata;
         channeldata = (struct ChannelData *)realloc(
             channeldata, sizeof(struct ChannelData) * numchans);
+        if (!channeldata) {
+            /* Restore the original to avoid leaking it */
+            channeldata = cd_org;
+            return PyErr_NoMemory();
+        }
         for (i = numchanneldata; i < numchans; ++i) {
             channeldata[i].sound = NULL;
             channeldata[i].queue = NULL;

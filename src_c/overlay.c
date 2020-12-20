@@ -23,6 +23,7 @@
  * Dmitry Borisov
  */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include "pygame.h"
@@ -148,8 +149,10 @@ Overlay_New(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     // Create layer with desired format
     self->cOverlay = SDL_CreateYUVOverlay(w, h, pixelformat, screen);
-    if (!self->cOverlay)
+    if (!self->cOverlay) {
+        Py_TYPE(self)->tp_free(self);
         return RAISE(pgExc_SDLError, "Cannot create overlay");
+    }
 
     self->cRect.x = 0;
     self->cRect.y = 0;
@@ -170,7 +173,8 @@ static PyMethodDef Overlay_methods[] = {
 };
 
 PyTypeObject PyOverlay_Type = {
-    TYPE_HEAD(NULL, 0) "pygame.overlay",      /*tp_name*/
+    PyVarObject_HEAD_INIT(NULL,0)
+    "pygame.overlay",                         /*tp_name*/
     sizeof(PyGameOverlay),                    /*tp_basicsize*/
     0,                                        /*tp_itemsize*/
     (destructor)overlay_dealloc,              /*tp_dealloc*/

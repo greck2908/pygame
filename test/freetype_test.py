@@ -10,6 +10,11 @@ import weakref
 import gc
 import platform
 
+try:
+    import pathlib
+except ImportError:
+    pathlib = None
+
 IS_PYPY = "PyPy" == platform.python_implementation()
 
 
@@ -712,7 +717,7 @@ class FreeTypeFontTest(unittest.TestCase):
         # misc parameter test
         self.assertRaises(ValueError, font.render_to, surf, (0, 0), "foobar", color)
         self.assertRaises(
-            TypeError, font.render_to, surf, (0, 0), "foobar", color, "", size=24
+            TypeError, font.render_to, surf, (0, 0), "foobar", color, 2.3, size=24
         )
         self.assertRaises(
             ValueError,
@@ -770,7 +775,7 @@ class FreeTypeFontTest(unittest.TestCase):
 
         # misc parameter test
         self.assertRaises(ValueError, font.render, "foobar", color)
-        self.assertRaises(TypeError, font.render, "foobar", color, "", size=24)
+        self.assertRaises(TypeError, font.render, "foobar", color, 2.3, size=24)
         self.assertRaises(
             ValueError, font.render, "foobar", color, None, style=42, size=24
         )
@@ -880,9 +885,6 @@ class FreeTypeFontTest(unittest.TestCase):
         finally:
             font.antialiased = save_antialiased
 
-    @unittest.skipIf(
-        pygame.get_sdl_version()[0] == 2, "skipping due to blending issue (#864)"
-    )
     def test_freetype_Font_render_to_mono(self):
         # Blitting is done in two stages. First the target is alpha filled
         # with the background color, if any. Second, the foreground
@@ -1229,7 +1231,41 @@ class FreeTypeFontTest(unittest.TestCase):
 
         self.assertRaises(AttributeError, setattr, f, "fgcolor", None)
 
+    def test_freetype_Font_bgcolor(self):
+        f = ft.Font(None, 32)
+        zero = "0"  # the default font 0 glyph does not have a pixel at (0, 0)
+        f.origin = False
+        f.pad = False
+
+        transparent_black = pygame.Color(0, 0, 0, 0)  # initial color
+        green = pygame.Color("green")
+        alpha128 = pygame.Color(10, 20, 30, 128)
+
+        c = f.bgcolor
+        self.assertIsInstance(c, pygame.Color)
+        self.assertEqual(c, transparent_black)
+
+        s, r = f.render(zero, pygame.Color(255, 255, 255))
+        self.assertEqual(s.get_at((0, 0)), transparent_black)
+
+        f.bgcolor = green
+        self.assertEqual(f.bgcolor, green)
+
+        s, r = f.render(zero)
+        self.assertEqual(s.get_at((0, 0)), green)
+
+        f.bgcolor = alpha128
+        s, r = f.render(zero)
+        self.assertEqual(s.get_at((0, 0)), alpha128)
+
+        surf = pygame.Surface(f.get_rect(zero).size, pygame.SRCALPHA, 32)
+        f.render_to(surf, (0, 0), None)
+        self.assertEqual(surf.get_at((0, 0)), alpha128)
+
+        self.assertRaises(AttributeError, setattr, f, "bgcolor", None)
+
     @unittest.skipIf(not pygame.HAVE_NEWBUF, "newbuf not implemented")
+    @unittest.skipIf(IS_PYPY, "pypy2 no likey")
     def test_newbuf(self):
         from pygame.tests.test_utils import buftools
 
@@ -1616,12 +1652,12 @@ class FreeTypeFontTest(unittest.TestCase):
             self.assertEqual(getrefcount(font.render_raw_to(array, text)), 1)
             o = font.get_metrics("AB")
             self.assertEqual(getrefcount(o), 2)
-            for i in range(len(o)):
-                self.assertEqual(getrefcount(o[i]), 2, "refcount fail for item %d" % i)
+            for i, item in enumerate(o):
+                self.assertEqual(getrefcount(item), 2, "refcount fail for item %d" % i)
             o = font.get_sizes()
             self.assertEqual(getrefcount(o), 2)
-            for i in range(len(o)):
-                self.assertEqual(getrefcount(o[i]), 2, "refcount fail for item %d" % i)
+            for i, item in enumerate(o):
+                self.assertEqual(getrefcount(item), 2, "refcount fail for item %d" % i)
 
     def test_display_surface_quit(self):
         """Font.render_to() on a closed display surface"""
@@ -1654,6 +1690,53 @@ class FreeTypeFontTest(unittest.TestCase):
 
         for test in tests:
             run_test(test["method"], test["value"], test["msg"])
+
+    def test_freetype_SysFont_name(self):
+        """that SysFont accepts names of various types"""
+        fonts = pygame.font.get_fonts()
+        size = 12
+
+        # Check single name string:
+        font_name = ft.SysFont(fonts[0], size).name
+        self.assertFalse(font_name is None)
+
+        # Check string of comma-separated names.
+        names = ",".join(fonts)
+        font_name_2 = ft.SysFont(names, size).name
+        self.assertEqual(font_name_2, font_name)
+
+        # Check list of names.
+        font_name_2 = ft.SysFont(fonts, size).name
+        self.assertEqual(font_name_2, font_name)
+
+        # Check generator:
+        names = (name for name in fonts)
+        font_name_2 = ft.SysFont(names, size).name
+        self.assertEqual(font_name_2, font_name)
+
+        fonts_b = [f.encode() for f in fonts]
+
+        # Check single name bytes.
+        font_name_2 = ft.SysFont(fonts_b[0], size).name
+        self.assertEqual(font_name_2, font_name)
+
+        # Check comma-separated bytes.
+        names = b",".join(fonts_b)
+        font_name_2 = ft.SysFont(names, size).name
+        self.assertEqual(font_name_2, font_name)
+
+        # Check list of bytes.
+        font_name_2 = ft.SysFont(fonts_b, size).name
+        self.assertEqual(font_name_2, font_name)
+
+        # Check mixed list of bytes and string.
+        names = [fonts[0], fonts_b[1], fonts[2], fonts_b[3]]
+        font_name_2 = ft.SysFont(names, size).name
+        self.assertEqual(font_name_2, font_name)
+
+    @unittest.skipIf(pathlib is None, "no pathlib")
+    def test_pathlib(self):
+        f = ft.Font(pathlib.Path(self._fixed_path), 20)
 
 
 class FreeTypeTest(unittest.TestCase):

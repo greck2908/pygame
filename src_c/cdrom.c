@@ -86,7 +86,7 @@ cdrom_init(PyObject *self)
 static PyObject *
 get_init(PyObject *self)
 {
-    return PyInt_FromLong(SDL_WasInit(SDL_INIT_CDROM) != 0);
+    return PyBool_FromLong(SDL_WasInit(SDL_INIT_CDROM) != 0);
 }
 
 static void
@@ -147,7 +147,7 @@ static PyObject *
 cd_get_init(PyObject *self, PyObject *args)
 {
     int cd_id = pgCD_AsID(self);
-    return PyInt_FromLong(cdrom_drivedata[cd_id] != NULL);
+    return PyBool_FromLong(cdrom_drivedata[cd_id] != NULL);
 }
 
 static PyObject *
@@ -525,7 +525,8 @@ static PyMethodDef cd_methods[] = {
     {NULL, NULL, 0, NULL}};
 
 static PyTypeObject pgCD_Type = {
-    TYPE_HEAD(NULL, 0) "CD", /* name */
+    PyVarObject_HEAD_INIT(NULL,0)
+    "CD",                    /* name */
     sizeof(pgCDObject),      /* basic size */
     0,                       /* itemsize */
     cd_dealloc,              /* dealloc */

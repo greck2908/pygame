@@ -142,6 +142,10 @@ static PyObject *
 _ftfont_getfgcolor(pgFontObject *, void *);
 static int
 _ftfont_setfgcolor(pgFontObject *, PyObject *, void *);
+static PyObject *
+_ftfont_getbgcolor(pgFontObject *, void *);
+static int
+_ftfont_setbgcolor(pgFontObject *, PyObject *, void *);
 
 static PyObject *
 _ftfont_getresolution(pgFontObject *, void *);
@@ -314,15 +318,21 @@ parse_dest(PyObject *dest, int *x, int *y)
         Py_DECREF(oj);
         return -1;
     }
-    i = PyInt_AsLong(oi);
+    if (!pg_IntFromObj(oi, &i)){
+        i = -1;
+    }
     Py_DECREF(oi);
-    if (i == -1 && PyErr_Occurred()) {
+    if (i == -1 ) {
         Py_DECREF(oj);
+        PyErr_SetString(PyExc_TypeError, "dest expects a pair of numbers");
         return -1;
     }
-    j = PyInt_AsLong(oj);
+    if (!pg_IntFromObj(oj, &j)){
+        j = -1;
+    }
     Py_DECREF(oj);
-    if (j == -1 && PyErr_Occurred()) {
+    if (j == -1 ) {
+        PyErr_SetString(PyExc_TypeError, "dest expects a pair of numbers");
         return -1;
     }
     *x = i;
@@ -620,6 +630,8 @@ static PyGetSetDef _ftfont_getsets[] = {
      DOC_FONTROTATION, 0},
     {"fgcolor", (getter)_ftfont_getfgcolor, (setter)_ftfont_setfgcolor,
      DOC_FONTFGCOLOR, 0},
+     {"bgcolor", (getter)_ftfont_getbgcolor, (setter)_ftfont_setbgcolor,
+     DOC_FONTBGCOLOR, 0},
     {"origin", (getter)_ftfont_getrender_flag, (setter)_ftfont_setrender_flag,
      DOC_FONTORIGIN, (void *)FT_RFLAG_ORIGIN},
 #if defined(PGFT_DEBUG_CACHE)
@@ -635,7 +647,8 @@ static PyGetSetDef _ftfont_getsets[] = {
 #define FULL_TYPE_NAME MODULE_NAME "." FONT_TYPE_NAME
 
 PyTypeObject pgFont_Type = {
-    TYPE_HEAD(0, 0) FULL_TYPE_NAME,           /* tp_name */
+    PyVarObject_HEAD_INIT(0,0)
+    FULL_TYPE_NAME,                           /* tp_name */
     sizeof(pgFontObject),                     /* tp_basicsize */
     0,                                        /* tp_itemsize */
     (destructor)_ftfont_dealloc,              /* tp_dealloc */
@@ -715,6 +728,11 @@ _ftfont_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds)
         obj->fgcolor[1] = 0;
         obj->fgcolor[2] = 0;
         obj->fgcolor[3] = 255;
+        obj->is_bg_col_set = 0;
+        obj->bgcolor[0] = 0; /* rgba transparent black */
+        obj->bgcolor[1] = 0;
+        obj->bgcolor[2] = 0;
+        obj->bgcolor[3] = 0;
     }
     return (PyObject *)obj;
 }
@@ -1104,6 +1122,8 @@ _ftfont_setsize(pgFontObject *self, PyObject *value, void *closure)
 {
     Scale_t face_size;
 
+    DEL_ATTR_NOT_SUPPORTED_CHECK("size", value);
+
     if (!obj_to_scale(value, &face_size))
         goto error;
     self->face_size = face_size;
@@ -1123,8 +1143,12 @@ static int
 _ftfont_setunderlineadjustment(pgFontObject *self, PyObject *value,
                                void *closure)
 {
-    PyObject *adjustmentobj = PyNumber_Float(value);
+    PyObject *adjustmentobj;
     double adjustment;
+
+    DEL_ATTR_NOT_SUPPORTED_CHECK("underline_adjustment", value);
+
+    adjustmentobj = PyNumber_Float(value);
 
     if (!adjustmentobj) {
         return -1;
@@ -1225,6 +1249,9 @@ _ftfont_setrender_flag(pgFontObject *self, PyObject *value, void *closure)
 {
     const long render_flag = (long)closure;
 
+    /* Generic setter; We do not know the name of the attribute */
+    DEL_ATTR_NOT_SUPPORTED_CHECK(NULL, value);
+
     if (!PyBool_Check(value)) {
         PyErr_SetString(PyExc_TypeError, "The style value must be a boolean");
         return -1;
@@ -1257,6 +1284,9 @@ _ftfont_getrotation(pgFontObject *self, void *closure)
 static int
 _ftfont_setrotation(pgFontObject *self, PyObject *value, void *closure)
 {
+
+    DEL_ATTR_NOT_SUPPORTED_CHECK("rotation", value);
+
     if (!self->is_scalable) {
         if (pgFont_IS_ALIVE(self)) {
             PyErr_SetString(PyExc_AttributeError,
@@ -1281,11 +1311,38 @@ _ftfont_getfgcolor(pgFontObject *self, void *closure)
 static int
 _ftfont_setfgcolor(pgFontObject *self, PyObject *value, void *closure)
 {
+
+    DEL_ATTR_NOT_SUPPORTED_CHECK("fgcolor", value);
+
     if (!pg_RGBAFromObj(value, self->fgcolor)) {
         PyErr_Format(PyExc_AttributeError,
                      "unable to convert %128s object to a color",
                      Py_TYPE(value)->tp_name);
         return -1;
+    }
+    return 0;
+}
+
+static PyObject *
+_ftfont_getbgcolor(pgFontObject *self, void *closure)
+{
+    return pgColor_New(self->bgcolor);
+}
+
+static int
+_ftfont_setbgcolor(pgFontObject *self, PyObject *value, void *closure)
+{
+
+    DEL_ATTR_NOT_SUPPORTED_CHECK("bgcolor", value);
+
+    if (!pg_RGBAFromObj(value, self->bgcolor)) {
+        PyErr_Format(PyExc_AttributeError,
+                     "unable to convert %128s object to a color",
+                     Py_TYPE(value)->tp_name);
+        return -1;
+    }
+    else{
+        self->is_bg_col_set = 1;
     }
     return 0;
 }
@@ -1786,8 +1843,8 @@ _ftfont_render(pgFontObject *self, PyObject *args, PyObject *kwds)
     }
 
     if (fg_color_obj) {
-        if (!pg_RGBAFromColorObj(fg_color_obj, (Uint8 *)&fg_color)) {
-            PyErr_SetString(PyExc_TypeError, "fgcolor must be a Color");
+        if (!pg_RGBAFromFuzzyColorObj(fg_color_obj, (Uint8 *)&fg_color)) {
+            /* Exception already set for us */
             goto error;
         }
     }
@@ -1797,10 +1854,22 @@ _ftfont_render(pgFontObject *self, PyObject *args, PyObject *kwds)
         fg_color.b = self->fgcolor[2];
         fg_color.a = self->fgcolor[3];
     }
+
     if (bg_color_obj) {
-        if (!pg_RGBAFromColorObj(bg_color_obj, (Uint8 *)&bg_color)) {
-            PyErr_SetString(PyExc_TypeError, "bgcolor must be a Color");
+        if (!pg_RGBAFromFuzzyColorObj(bg_color_obj, (Uint8 *)&bg_color)) {
+            /* Exception already set for us */
             goto error;
+        }
+    }
+    else{
+        if (self->is_bg_col_set){
+            bg_color.r = self->bgcolor[0];
+            bg_color.g = self->bgcolor[1];
+            bg_color.b = self->bgcolor[2];
+            bg_color.a = self->bgcolor[3];
+        }
+        else{
+           bg_color_obj = 0;
         }
     }
 
@@ -1817,12 +1886,13 @@ _ftfont_render(pgFontObject *self, PyObject *args, PyObject *kwds)
         goto error;
 
     surface =
-        _PGFT_Render_NewSurface(self->freetype, self, &render, text, &fg_color,
-                                bg_color_obj ? &bg_color : 0, &r);
+        _PGFT_Render_NewSurface(
+            self->freetype, self, &render, text, &fg_color,
+            (bg_color_obj || self->is_bg_col_set) ? &bg_color : 0, &r);
     if (!surface)
         goto error;
     free_string(text);
-    surface_obj = pgSurface_New(surface);
+    surface_obj = (PyObject *)pgSurface_New(surface);
     if (!surface_obj)
         goto error;
 
@@ -1906,8 +1976,8 @@ _ftfont_render_to(pgFontObject *self, PyObject *args, PyObject *kwds)
     if (parse_dest(dest, &xpos, &ypos))
         goto error;
     if (fg_color_obj) {
-        if (!pg_RGBAFromColorObj(fg_color_obj, (Uint8 *)&fg_color)) {
-            PyErr_SetString(PyExc_TypeError, "fgcolor must be a Color");
+        if (!pg_RGBAFromFuzzyColorObj(fg_color_obj, (Uint8 *)&fg_color)) {
+            /* Exception already set for us */
             goto error;
         }
     }
@@ -1918,9 +1988,20 @@ _ftfont_render_to(pgFontObject *self, PyObject *args, PyObject *kwds)
         fg_color.a = self->fgcolor[3];
     }
     if (bg_color_obj) {
-        if (!pg_RGBAFromColorObj(bg_color_obj, (Uint8 *)&bg_color)) {
-            PyErr_SetString(PyExc_TypeError, "bgcolor must be a Color");
+        if (!pg_RGBAFromFuzzyColorObj(bg_color_obj, (Uint8 *)&bg_color)) {
+            /* Exception already set for us */
             goto error;
+        }
+    }
+    else{
+        if (self->is_bg_col_set){
+            bg_color.r = self->bgcolor[0];
+            bg_color.g = self->bgcolor[1];
+            bg_color.b = self->bgcolor[2];
+            bg_color.a = self->bgcolor[3];
+        }
+        else{
+           bg_color_obj = 0;
         }
     }
 
@@ -1943,9 +2024,10 @@ _ftfont_render_to(pgFontObject *self, PyObject *args, PyObject *kwds)
         PyErr_SetString(pgExc_SDLError, "display Surface quit");
         goto error;
     }
-    if (_PGFT_Render_ExistingSurface(self->freetype, self, &render, text,
-                                     surface, xpos, ypos, &fg_color,
-                                     bg_color_obj ? &bg_color : 0, &r))
+    if (_PGFT_Render_ExistingSurface(
+            self->freetype, self, &render, text,
+            surface, xpos, ypos, &fg_color,
+            (bg_color_obj || self->is_bg_col_set) ? &bg_color : 0, &r))
         goto error;
     free_string(text);
 

@@ -60,12 +60,6 @@ QDGlobals pg_qd;
 #endif
 #define BUF_MY_ENDIAN '='
 
-#if PY3
-#define INT_CHECK(o) PyLong_Check(o)
-#else
-#define INT_CHECK(o) (PyInt_Check(o) || PyLong_Check(o))
-#endif
-
 /* Extended array struct */
 typedef struct pg_capsule_interface_s {
     PyArrayInterface inter;
@@ -87,7 +81,8 @@ static int pg_is_init = 0;
 static int pg_sdl_was_init = 0;
 #if IS_SDLv2
 SDL_Window *pg_default_window = NULL;
-PyObject *pg_default_screen = NULL;
+pgSurfaceObject *pg_default_screen = NULL;
+static char * pg_env_blend_alpha_SDL2 = NULL;
 #endif /* IS_SDLv2 */
 
 static void
@@ -182,10 +177,12 @@ static SDL_Window *
 pg_GetDefaultWindow(void);
 static void
 pg_SetDefaultWindow(SDL_Window *);
-static PyObject *
+static pgSurfaceObject *
 pg_GetDefaultWindowSurface(void);
 static void
-pg_SetDefaultWindowSurface(PyObject *);
+pg_SetDefaultWindowSurface(pgSurfaceObject *);
+static char *
+pg_EnvShouldBlendAlphaSDL2(void);
 #endif /* IS_SDLv2 */
 
 static int
@@ -241,7 +238,12 @@ pg_RegisterQuit(void (*func)(void))
     }
     if (func) {
         PyObject *obj = PyCapsule_New(func, "quit", NULL);
-        PyList_Append(pg_quit_functions, obj);
+        if (!obj) {
+            return;
+        }
+        /* There is no difference between success and error
+           for PyList_Append in this case */
+        (void)PyList_Append(pg_quit_functions, obj);
         Py_DECREF(obj);
     }
 }
@@ -255,7 +257,9 @@ pg_register_quit(PyObject *self, PyObject *value)
             return NULL;
         }
     }
-    PyList_Append(pg_quit_functions, value);
+    if (0 != PyList_Append(pg_quit_functions, value)) {
+        return NULL; /* Exception already set */
+    }
 
     Py_RETURN_NONE;
 }
@@ -279,6 +283,10 @@ pg_init(PyObject *self, PyObject *args)
 #else
     pg_sdl_was_init = SDL_Init(SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE) == 0;
 #endif
+
+#if IS_SDLv2
+    pg_env_blend_alpha_SDL2 = SDL_getenv("PYGAME_BLEND_ALPHA_SDL2");
+#endif /* IS_SDLv2 */
 
     pg_is_init = 1;  // Considered initialized at this point?
 
@@ -410,7 +418,17 @@ pg_get_init(PyObject *self, PyObject *args)
 static int
 pg_IntFromObj(PyObject *obj, int *val)
 {
-    int tmp_val = PyInt_AsLong(obj);
+    int tmp_val;
+
+    if (PyFloat_Check(obj)) {
+        /* Python3.8 complains with deprecation warnings if we pass
+         * floats to PyInt_AsLong.
+         */
+        double dv = PyFloat_AsDouble(obj);
+        tmp_val = (int)dv;
+    } else {
+        tmp_val = PyInt_AsLong(obj);
+    }
 
     if (tmp_val == -1 && PyErr_Occurred()) {
         PyErr_Clear();
@@ -567,8 +585,8 @@ pg_get_error(PyObject *self, PyObject *args)
 #if IS_SDLv1 && PY3 && !defined(PYPY_VERSION)
     /* SDL 1's encoding is ambiguous */
     PyObject *obj;
-    if (obj = PyUnicode_DecodeUTF8(SDL_GetError(),
-                                   strlen(SDL_GetError()), "strict"))
+    if ((obj = PyUnicode_DecodeUTF8(SDL_GetError(),
+                                   strlen(SDL_GetError()), "strict")))
         return obj;
     PyErr_Clear();
     return PyUnicode_DecodeLocale(SDL_GetError(), "surrogateescape");
@@ -1035,8 +1053,6 @@ pgObject_GetBuffer(PyObject *obj, pg_buffer *pg_view_p, int flags)
     flags |= PyBUF_PYGAME;
 #endif
 
-#if PG_ENABLE_NEWBUF
-
     if (PyObject_CheckBuffer(obj)) {
         char *fchar_p;
 
@@ -1115,7 +1131,6 @@ pgObject_GetBuffer(PyObject *obj, pg_buffer *pg_view_p, int flags)
         success = 1;
     }
 
-#endif
     if (!success && pgGetArrayStruct(obj, &cobj, &inter_p) == 0) {
         if (pgArrayStruct_AsBuffer(pg_view_p, cobj, inter_p, flags)) {
             Py_DECREF(cobj);
@@ -1509,7 +1524,12 @@ _pg_typestr_check(PyObject *op)
         return -1;
     }
     if (PyUnicode_Check(op)) {
-        if (PyUnicode_GET_SIZE(op) != 3) {
+#if PY2
+        Py_ssize_t len = PyUnicode_GET_SIZE(op);
+#else
+        Py_ssize_t len = PyUnicode_GET_LENGTH(op);
+#endif
+        if (len != 3) {
             PyErr_SetString(PyExc_ValueError,
                             "expected 'typestr' to be length 3");
             return -1;
@@ -1913,15 +1933,15 @@ pg_SetDefaultWindow(SDL_Window *win)
     pg_default_window = win;
 }
 
-static PyObject *
+static pgSurfaceObject *
 pg_GetDefaultWindowSurface(void)
 {
-    /*return a borrowed reference*/
+    /* return a borrowed reference*/
     return pg_default_screen;
 }
 
 static void
-pg_SetDefaultWindowSurface(PyObject *screen)
+pg_SetDefaultWindowSurface(pgSurfaceObject *screen)
 {
     /*a screen surface can be replaced with itself*/
     if (screen == pg_default_screen) {
@@ -1930,6 +1950,12 @@ pg_SetDefaultWindowSurface(PyObject *screen)
     Py_XINCREF(screen);
     Py_XDECREF(pg_default_screen);
     pg_default_screen = screen;
+}
+
+static char *
+pg_EnvShouldBlendAlphaSDL2(void)
+{
+    return pg_env_blend_alpha_SDL2;
 }
 #endif /* IS_SDLv2 */
 
@@ -2140,13 +2166,9 @@ MODINIT_DEFINE(base)
         MODINIT_ERROR;
     }
 
-#if PG_ENABLE_NEWBUF
     pgExc_BufferError =
         PyErr_NewException("pygame.BufferError", PyExc_BufferError, NULL);
-#else
-    pgExc_BufferError =
-        PyErr_NewException("pygame.BufferError", PyExc_RuntimeError, NULL);
-#endif
+
     if (pgExc_SDLError == NULL) {
         Py_XDECREF(atexit_register);
         DECREF_MOD(module);
@@ -2187,7 +2209,8 @@ MODINIT_DEFINE(base)
     c_api[20] = pg_SetDefaultWindow;
     c_api[21] = pg_GetDefaultWindowSurface;
     c_api[22] = pg_SetDefaultWindowSurface;
-#define FILLED_SLOTS 23
+    c_api[23] = pg_EnvShouldBlendAlphaSDL2;
+#define FILLED_SLOTS 24
 #endif /* IS_SDLv2 */
 
 #if PYGAMEAPI_BASE_NUMSLOTS != FILLED_SLOTS
@@ -2210,7 +2233,7 @@ MODINIT_DEFINE(base)
         MODINIT_ERROR;
     }
 
-    if (PyModule_AddIntConstant(module, "HAVE_NEWBUF", PG_ENABLE_NEWBUF)) {
+    if (PyModule_AddIntConstant(module, "HAVE_NEWBUF", 1)) {
         Py_XDECREF(atexit_register);
         Py_DECREF(pgExc_BufferError);
         DECREF_MOD(module);
